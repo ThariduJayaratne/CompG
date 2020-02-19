@@ -112,7 +112,7 @@ vector<Colour> readmat(){
       rgb.push_back(vec3(r,g,b));
     }
   }
-  for(int i = 0; i<colors.size(); i++){
+  for(u_int i = 0; i<colors.size(); i++){
     Colour test;
     test.name = colors[i];
     test.red = rgb[i].x;
@@ -152,7 +152,7 @@ vector<ModelTriangle> readtriangles(){
     string *splitLine = split(line, ' ');
     if(splitLine[0] == "usemtl") {
       string readColour = splitLine[1];
-      for (int i = 0; i < colours.size(); i++) {
+      for (u_int i = 0; i < colours.size(); i++) {
         if(readColour == colours[i].name) colour = colours[i];
       }
     }
@@ -169,32 +169,58 @@ vector<ModelTriangle> readtriangles(){
       triangles.push_back(ModelTriangle(readvertices[p1], readvertices[p2], readvertices[p3], colour));
     }
   }
- //  for(int i=0; i<triangles.size(); i++) {
- //    std::cout << "NEW TRIANGLE" << ' ';
- //    std::cout << "V1" << ' ';
- //    std::cout << triangles[i].vertices[0].x << ' ';
- //    std::cout << triangles[i].vertices[0].y << ' ';
- //    std::cout << triangles[i].vertices[0].z << ' ';
- //    std::cout << "V2" << ' ';
- //    std::cout << triangles[i].vertices[1].x << ' ';
- //    std::cout << triangles[i].vertices[1].y << ' ';
- //    std::cout << triangles[i].vertices[1].z << ' ';
- //    std::cout << "V3" << ' ';
- //    std::cout << triangles[i].vertices[2].x << ' ';
- //    std::cout << triangles[i].vertices[2].y << ' ';
- //    std::cout << triangles[i].vertices[2].z << ' ';
- //    std::cout << triangles[i].colour << ' ';
- // }
   return triangles;
 }
 
+void filltriangle(CanvasPoint point1, CanvasPoint point2, CanvasPoint point3, uint32_t colour) {
+  for (int i = 0; i < 2; i++) {
+    if (point3.y < point2.y) {
+      CanvasPoint temp = point2;
+      point2 = point3;
+      point3 = temp;
+    }
+    if (point2.y < point1.y) {
+      CanvasPoint temp = point1;
+      point1 = point2;
+      point2 = temp;
+    }
+    if (point3.y < point1.y) {
+      CanvasPoint temp = point1;
+      point1 = point3;
+      point3 = temp;
+    }
+  }
+  float x = ((point3.x - point1.x)*(point2.y - point1.y))/(point3.y - point1.y);
+  CanvasPoint point4 = CanvasPoint(round(point1.x + x), point2.y);
+
+  vector<CanvasPoint> points1to4 = interpolation2(point1,point4,(point4.y-point1.y));
+  vector<CanvasPoint> points1to2 = interpolation2(point1,point2,(point2.y-point1.y));
+  vector<CanvasPoint> points4to3 = interpolation2(point4,point3,(point3.y-point4.y));
+  vector<CanvasPoint> points2to3 = interpolation2(point2,point3,(point3.y-point2.y));
+  vector<CanvasPoint> points4to2 = interpolation2(point4,point2,abs(point2.x-point4.x));
+  vector<CanvasPoint> pointstofill;
+
+  for (u_int i = 0; i < points1to4.size(); i++) {
+    for (u_int j = 0; j < points1to2.size(); j++) {
+      line(points1to4[i],points1to2[j],colour);
+    }
+  }
+  for (u_int i = 0; i < points4to3.size(); i++) {
+    for (u_int j = 0; j < points2to3.size(); j++) {
+      line(points4to3[i],points2to3[j],colour);
+    }
+ }
+}
+
 void drawWireframes(){
+  vec3 camera = vec3(0,0,6);
+  float f = 250;
   vector<ModelTriangle> triangles = readtriangles();
   vector<CanvasTriangle> canvastriangles;
-  for(int i=0;i<triangles.size();i++){
-    CanvasPoint test1;
-    CanvasPoint test2;
-    CanvasPoint test3;
+  for(u_int i=0;i<triangles.size();i++){
+    CanvasPoint test1,test2,test3;
+    CanvasPoint projP1,projP2,projP3;
+    float cameraP1x,cameraP1y,cameraP1z,cameraP2x,cameraP2y,cameraP2z,cameraP3x,cameraP3y,cameraP3z;
     test1.x = triangles[i].vertices[0].x;
     test2.x = triangles[i].vertices[1].x;
     test3.x = triangles[i].vertices[2].x;
@@ -204,14 +230,44 @@ void drawWireframes(){
     test1.depth = triangles[i].vertices[0].z;
     test2.depth = triangles[i].vertices[1].z;
     test3.depth = triangles[i].vertices[2].z;
-    canvastriangles.push_back(CanvasTriangle(test1,test2,test3));
+
+    cameraP1x = test1.x - camera.x;
+    cameraP1y = test1.y - camera.y;
+    cameraP1z = test1.depth - camera.z;
+    float p1Screen = f/-cameraP1z;
+    int P1XProj = (cameraP1x * p1Screen) + WIDTH/2;
+    int P1YProj = ((1 - cameraP1y) * p1Screen) + HEIGHT/2;
+    projP1.x = P1XProj;
+    projP1.y = P1YProj;
+
+    cameraP2x = test2.x - camera.x;
+    cameraP2y = test2.y - camera.y;
+    cameraP2z = test2.depth - camera.z;
+    float p2Screen = f/-cameraP2z;
+    int P2XProj = (cameraP2x * p2Screen) + WIDTH/2;
+    int P2YProj = ((1 - cameraP2y) * p2Screen) + HEIGHT/2;
+    projP2.x = P2XProj;
+    projP2.y = P2YProj;
+
+    cameraP3x = test3.x - camera.x;
+    cameraP3y = test3.y - camera.y;
+    cameraP3z = test3.depth - camera.z;
+    float p3Screen = f/-cameraP3z;
+    int P3XProj = (cameraP3x * p3Screen) + WIDTH/2;
+    int P3YProj = ((1 - cameraP3y) * p3Screen) + HEIGHT/2;
+    projP3.x = P3XProj;
+    projP3.y = P3YProj;
+
+    canvastriangles.push_back(CanvasTriangle(projP1,projP2,projP3));
   }
-  for(int i =0;i<canvastriangles.size();i++){
-    float red = 255;
-    float green = 255;
-    float blue = 255;
+  for(u_int i =0;i<triangles.size();i++){
+    Colour c = triangles[i].colour;
+    float red = c.red;
+    float green = c.green;
+    float blue = c.blue;
     uint32_t colour = (255<<24) + (int(red)<<16) + (int(green)<<8) + int(blue);
-    triangle(canvastriangles[i].vertices[0],canvastriangles[i].vertices[1],canvastriangles[i].vertices[2],colour);
+    // triangle(canvastriangles[i].vertices[0],canvastriangles[i].vertices[1],canvastriangles[i].vertices[2],colour);
+    filltriangle(canvastriangles[i].vertices[0],canvastriangles[i].vertices[1],canvastriangles[i].vertices[2],colour);
   }
 }
 
@@ -249,110 +305,11 @@ int main(int argc, char* argv[])
   drawWireframes();
   while(true)
   {
-    // We MUST poll for events - otherwise the window will freeze !
     if(window.pollForInputEvents(&event)) handleEvent(event);
-    // update();
-    // draw();
-    // greyscale();    colorscale();
-    // colorscale();
-    // Need to render the frame at the end, or nothing actually gets shown on the screen !
     window.renderFrame();
   }
-  // vector<float> test = interpolation(2.2,8.5,7);
-  // vector<vec3> test2 = interpolation3(vec3( 1, 4, 9.2 ),vec3( 4, 1, 9.8 ),4);
-  // for(int i=0; i<test.size(); ++i) {
-  //   std::cout << test[i] << ' ';
-  // }
-  // for(int i=0; i<test2.size(); ++i) {
-  //   std::cout << test2[i].x << ' ';
-  //   std::cout << test2[i].y << ' ';
-  //   std::cout << test2[i].z << ' ';
-  // }
 }
 
-void filltriangle(CanvasPoint point1, CanvasPoint point2, CanvasPoint point3, uint32_t colour) {
-  for (int i = 0; i < 2; i++) {
-    if (point3.y < point2.y) {
-      CanvasPoint temp = point2;
-      point2 = point3;
-      point3 = temp;
-    }
-    if (point2.y < point1.y) {
-      CanvasPoint temp = point1;
-      point1 = point2;
-      point2 = temp;
-    }
-    if (point3.y < point1.y) {
-      CanvasPoint temp = point1;
-      point1 = point3;
-      point3 = temp;
-    }
-  }
-  float x = ((point3.x - point1.x)*(point2.y - point1.y))/(point3.y - point1.y);
-  CanvasPoint point4 = CanvasPoint(round(point1.x + x), point2.y);
-  // vector<CanvasPoint> points4 = interpolation2(point1,point3,(point3.y-point1.y));
-  // CanvasPoint point4;
-  // for(int i = 0; i < points4.size(); i++){
-  //   if(points4[i].y == point2.y){
-  //     point4 = points4[i];
-  //   }
-  // }
-  vector<CanvasPoint> points1to4 = interpolation2(point1,point4,(point4.y-point1.y));
-  vector<CanvasPoint> points1to2 = interpolation2(point1,point2,(point2.y-point1.y));
-  vector<CanvasPoint> points4to3 = interpolation2(point4,point3,(point3.y-point4.y));
-  vector<CanvasPoint> points2to3 = interpolation2(point2,point3,(point3.y-point2.y));
-  vector<CanvasPoint> points4to2 = interpolation2(point4,point2,abs(point2.x-point4.x));
-  vector<CanvasPoint> pointstofill;
-
-  for (unsigned int i = 0; i < points1to4.size(); i++) {
-    for (unsigned int j = 0; j < points1to2.size(); j++) {
-      pointstofill = interpolation2(points1to4[i],points1to2[j],abs(points1to4[i].x-points1to2[j].x));
-      for(unsigned int k=0;k<pointstofill.size();k++){
-        window.setPixelColour(pointstofill[k].x, pointstofill[k].y, colour);
-      }
-    }
-  }
-  for (unsigned int i = 0; i < points4to3.size(); i++) {
-    for (unsigned int j = 0; j < points2to3.size(); j++) {
-      pointstofill = interpolation2(points4to3[i],points2to3[j],abs(points4to3[i].x-points2to3[j].x));
-      for(unsigned int k=0;k<pointstofill.size();k++){
-        window.setPixelColour(pointstofill[k].x, pointstofill[k].y, colour);
-      }
-    }
-  }
-  // for (int i = 0; i < points4to2.size(); i++) {
-  //   window.setPixelColour(points4to2[i].x, points4to2[i].y, colour);
-  // }
-  // for (int i = 0; i < points1to4.size(); i++) {
-  //   for (int j = 0; j < abs(points1to2[i].x - points1to4[i].x); j++) {
-  //     if(points1to4[i].x <= points1to2[i].x) {
-  //       window.setPixelColour(points1to4[i].x + j, points1to4[i].y, colour);
-  //     }
-  //     else {
-  //       window.setPixelColour(points1to4[i].x - j, points1to4[i].y, colour);
-  //     }
-  //   }
-  // }
-  // for (int i = 0; i < points4to3.size(); i++) {
-  //   for (int j = 0; j < abs(points2to3[i].x - points4to3[i].x); j++) {
-  //     if(points4to3[i].x <= points2to3[i].x) {
-  //       window.setPixelColour(points4to3[i].x + j, points4to3[i].y, colour);
-  //     }
-  //     else {
-  //       window.setPixelColour(points4to3[i].x - j, points4to3[i].y, colour);
-  //     }
-  //   }
-  // }
-  // for (int i = 0; i < abs(point2.x - point4.x); i++) {
-  //   if(point4.x <= point2.x) {
-  //     window.setPixelColour(point4.x + i, point4.y, colour);
-  //   }
-  //   else {
-  //     window.setPixelColour(point4.x - i, point4.y, colour);
-  //   }
-  // }
-
-}
 void texturetriangle(CanvasPoint point1, CanvasPoint point2, CanvasPoint point3){
   vector<uint32_t> imgdata = loadImg();
   for (int i = 0; i < 2; i++) {
