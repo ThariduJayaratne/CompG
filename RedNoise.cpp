@@ -48,16 +48,12 @@ vector<vec3> interpolation3(vec3 from, vec3 to, int n) {
   return list;
 }
 
-vector<CanvasPoint> interpolation2(CanvasPoint from, CanvasPoint to, int n) {
+vector<CanvasPoint> interpolation2(CanvasPoint from, CanvasPoint to, float n) {
   vector<CanvasPoint> list;
-  // float stepx = (to.x - from.x)/(n-1);
-  // float stepy = (to.y - from.y)/(n-1);
-  // double stepDepth = (to.depth - from.depth)/(n-1);
-  float stepx = (to.x - from.x)/(n);
-  float stepy = (to.y - from.y)/(n);
-  double stepDepth = (to.depth - from.depth)/(n);
-  // for(int i = 0; i < n; i++) {
-  for(int i = 0; i <= n; i++) {
+  float stepx = (to.x - from.x)/(n - 1);
+  float stepy = (to.y - from.y)/(n - 1);
+  double stepDepth = (to.depth - from.depth)/(n - 1);
+  for(float i = 0; i < n; i++) {
     CanvasPoint pt;
     pt.x = from.x + i * stepx;
     pt.y = from.y + i * stepy;
@@ -187,6 +183,7 @@ vector<ModelTriangle> readtriangles(){
 }
 
 void filltriangle(CanvasPoint point1, CanvasPoint point2, CanvasPoint point3, uint32_t colour) {
+
   for (int i = 0; i < 2; i++) {
     if (point3.y < point2.y) {
       CanvasPoint temp = point2;
@@ -204,6 +201,7 @@ void filltriangle(CanvasPoint point1, CanvasPoint point2, CanvasPoint point3, ui
       point3 = temp;
     }
   }
+
   float x = ((point3.x - point1.x)*(point2.y - point1.y))/(point3.y - point1.y);
   CanvasPoint point4 = CanvasPoint(round(point1.x + x), point2.y);
 
@@ -214,15 +212,11 @@ void filltriangle(CanvasPoint point1, CanvasPoint point2, CanvasPoint point3, ui
   vector<CanvasPoint> points4to2 = interpolation2(point4,point2,abs(point2.x-point4.x));
 
   for (u_int i = 0; i < points1to4.size(); i++) {
-    for (u_int j = 0; j < points1to2.size(); j++) {
-      line(points1to4[i],points1to2[j],colour);
-    }
+      line(points1to4[i],points1to2[i],colour);
   }
   for (u_int i = 0; i < points4to3.size(); i++) {
-    for (u_int j = 0; j < points2to3.size(); j++) {
-      line(points4to3[i],points2to3[j],colour);
-    }
- }
+      line(points4to3[i],points2to3[i],colour);
+  }
 }
 
 vector<CanvasTriangle> drawWireframes(){
@@ -357,11 +351,10 @@ void bufferting(){
     double ratio = (point3.y - point2.y)/(point3.y - point1.y);
     double point4Depth = point1.depth - ratio * (point3.depth - point1.depth);
     CanvasPoint point4 = CanvasPoint(round(point1.x + x), point2.y,point4Depth);
-    vector<CanvasPoint> points1to4coord = interpolation2(point1,point4,(point4.y-point1.y)+1);
-    vector<CanvasPoint> points1to2coord = interpolation2(point1,point2,(point2.y-point1.y)+1);
-    vector<CanvasPoint> points4to3coord = interpolation2(point4,point3,(point3.y-point4.y)+1);
-    vector<CanvasPoint> points2to3coord = interpolation2(point2,point3,(point3.y-point2.y)+1);
-    vector<CanvasPoint> points4to2coord = interpolation2(point4,point2,abs(point2.x-point4.x)+1);
+    vector<CanvasPoint> points1to4coord = interpolation2(point1,point4,(point4.y-point1.y));
+    vector<CanvasPoint> points1to2coord = interpolation2(point1,point2,(point2.y-point1.y));
+    vector<CanvasPoint> points4to3coord = interpolation2(point4,point3,(point3.y-point4.y));
+    vector<CanvasPoint> points2to3coord = interpolation2(point2,point3,(point3.y-point2.y));
     vector<CanvasPoint> pointstofillcoord;
 
     for (u_int i = 0; i < points1to4coord.size(); i++) {
