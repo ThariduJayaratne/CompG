@@ -20,8 +20,16 @@ void handleEvent(SDL_Event event);
 
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
 
-vector<float> interpolation(float from, float to, int n) {
-  vector<float> list;
+// vector<float> interpolation(float from, float to, int n) {
+//   vector<float> list;
+//   float step = (to - from)/(n-1);
+//   for(int i = 0; i < n; i++) {
+//     list.push_back(from + i * step);
+//   }
+//   return list;
+// }
+vector<double> interpolation(double from, double to, int n) {
+  vector<double> list;
   float step = (to - from)/(n-1);
   for(int i = 0; i < n; i++) {
     list.push_back(from + i * step);
@@ -42,12 +50,18 @@ vector<vec3> interpolation3(vec3 from, vec3 to, int n) {
 
 vector<CanvasPoint> interpolation2(CanvasPoint from, CanvasPoint to, int n) {
   vector<CanvasPoint> list;
-  float stepx = (to.x - from.x)/(n-1);
-  float stepy = (to.y - from.y)/(n-1);
-  for(int i = 0; i < n; i++) {
+  // float stepx = (to.x - from.x)/(n-1);
+  // float stepy = (to.y - from.y)/(n-1);
+  // double stepDepth = (to.depth - from.depth)/(n-1);
+  float stepx = (to.x - from.x)/(n);
+  float stepy = (to.y - from.y)/(n);
+  double stepDepth = (to.depth - from.depth)/(n);
+  // for(int i = 0; i < n; i++) {
+  for(int i = 0; i <= n; i++) {
     CanvasPoint pt;
     pt.x = from.x + i * stepx;
     pt.y = from.y + i * stepy;
+    pt.depth = from.depth + i * stepDepth;
     list.push_back(pt);
   }
   return list;
@@ -198,7 +212,6 @@ void filltriangle(CanvasPoint point1, CanvasPoint point2, CanvasPoint point3, ui
   vector<CanvasPoint> points4to3 = interpolation2(point4,point3,(point3.y-point4.y));
   vector<CanvasPoint> points2to3 = interpolation2(point2,point3,(point3.y-point2.y));
   vector<CanvasPoint> points4to2 = interpolation2(point4,point2,abs(point2.x-point4.x));
-  vector<CanvasPoint> pointstofill;
 
   for (u_int i = 0; i < points1to4.size(); i++) {
     for (u_int j = 0; j < points1to2.size(); j++) {
@@ -212,7 +225,7 @@ void filltriangle(CanvasPoint point1, CanvasPoint point2, CanvasPoint point3, ui
  }
 }
 
-void drawWireframes(){
+vector<CanvasTriangle> drawWireframes(){
   vec3 camera = vec3(0,0,6);
   float f = 250;
   vector<ModelTriangle> triangles = readtriangles();
@@ -231,14 +244,17 @@ void drawWireframes(){
     test2.depth = triangles[i].vertices[1].z;
     test3.depth = triangles[i].vertices[2].z;
 
+    //PERSPECTIVE
     cameraP1x = test1.x - camera.x;
     cameraP1y = test1.y - camera.y;
     cameraP1z = test1.depth - camera.z;
+    //PROJECTION
     float p1Screen = f/-cameraP1z;
     int P1XProj = (cameraP1x * p1Screen) + WIDTH/2;
     int P1YProj = ((1 - cameraP1y) * p1Screen) + HEIGHT/2;
     projP1.x = P1XProj;
     projP1.y = P1YProj;
+    projP1.depth = 1/-(cameraP1z);
 
     cameraP2x = test2.x - camera.x;
     cameraP2y = test2.y - camera.y;
@@ -248,6 +264,8 @@ void drawWireframes(){
     int P2YProj = ((1 - cameraP2y) * p2Screen) + HEIGHT/2;
     projP2.x = P2XProj;
     projP2.y = P2YProj;
+    projP2.depth = 1/-(cameraP2z);
+
 
     cameraP3x = test3.x - camera.x;
     cameraP3y = test3.y - camera.y;
@@ -257,22 +275,23 @@ void drawWireframes(){
     int P3YProj = ((1 - cameraP3y) * p3Screen) + HEIGHT/2;
     projP3.x = P3XProj;
     projP3.y = P3YProj;
+    projP3.depth = 1/-(cameraP3z);
 
-    canvastriangles.push_back(CanvasTriangle(projP1,projP2,projP3));
+
+    canvastriangles.push_back(CanvasTriangle(projP1,projP2,projP3,triangles[i].colour));
   }
-  for(u_int i =0;i<triangles.size();i++){
-    Colour c = triangles[i].colour;
-    float red = c.red;
-    float green = c.green;
-    float blue = c.blue;
-    uint32_t colour = (255<<24) + (int(red)<<16) + (int(green)<<8) + int(blue);
-    // triangle(canvastriangles[i].vertices[0],canvastriangles[i].vertices[1],canvastriangles[i].vertices[2],colour);
-    filltriangle(canvastriangles[i].vertices[0],canvastriangles[i].vertices[1],canvastriangles[i].vertices[2],colour);
-  }
+  return canvastriangles;
+}
+double **malloc2dArray(int dim1, int dim2) {
+    double **array = (double **) malloc(dim1 * sizeof(double *));
+    for (int i = 0; i < dim1; i++) {
+        array[i] = (double *) malloc(dim2 * sizeof(double));
+    }
+    return array;
 }
 
 vector<uint32_t> loadImg(){
-  string line1;
+  string line1;  // double **buffer = malloc2dArray(WIDTH,HEIGHT);
   string line2;
   string line3;
   ifstream myfile;
@@ -299,10 +318,85 @@ vector<uint32_t> loadImg(){
   return pixeldata;
 }
 
+void bufferting(){
+  double **buffer = malloc2dArray(WIDTH,HEIGHT);
+  vector<CanvasTriangle> canvastriangles = drawWireframes();
+  for(u_int y=0; y<HEIGHT ;y++){
+    for(u_int x=0; x<WIDTH ;x++){
+      buffer[x][y] = -INFINITY;
+    }
+  }
+  for(u_int i=0;i<canvastriangles.size();i++){
+    CanvasPoint point1 = canvastriangles[i].vertices[0];
+    CanvasPoint point2 = canvastriangles[i].vertices[1];
+    CanvasPoint point3 = canvastriangles[i].vertices[2];
+    Colour c = canvastriangles[i].colour;
+    float red = c.red;
+    float green = c.green;
+    float blue = c.blue;
+    uint32_t colour = (255<<24) + (int(red)<<16) + (int(green)<<8) + int(blue);
+
+    for (int i = 0; i < 2; i++) {
+      if (point3.y < point2.y) {
+        CanvasPoint temp = point2;
+        point2 = point3;
+        point3 = temp;
+      }
+      if (point2.y < point1.y) {
+        CanvasPoint temp = point1;
+        point1 = point2;
+        point2 = temp;
+      }
+      if (point3.y < point1.y) {
+        CanvasPoint temp = point1;
+        point1 = point3;
+        point3 = temp;
+      }
+    }
+    float x = ((point3.x - point1.x)*(point2.y - point1.y))/(point3.y - point1.y);
+    double ratio = (point3.y - point2.y)/(point3.y - point1.y);
+    double point4Depth = point1.depth - ratio * (point3.depth - point1.depth);
+    CanvasPoint point4 = CanvasPoint(round(point1.x + x), point2.y,point4Depth);
+    vector<CanvasPoint> points1to4coord = interpolation2(point1,point4,(point4.y-point1.y)+1);
+    vector<CanvasPoint> points1to2coord = interpolation2(point1,point2,(point2.y-point1.y)+1);
+    vector<CanvasPoint> points4to3coord = interpolation2(point4,point3,(point3.y-point4.y)+1);
+    vector<CanvasPoint> points2to3coord = interpolation2(point2,point3,(point3.y-point2.y)+1);
+    vector<CanvasPoint> points4to2coord = interpolation2(point4,point2,abs(point2.x-point4.x)+1);
+    vector<CanvasPoint> pointstofillcoord;
+
+    for (u_int i = 0; i < points1to4coord.size(); i++) {
+        pointstofillcoord = interpolation2(points1to4coord[i],points1to2coord[i],abs(points1to4coord[i].x-points1to2coord[i].x));
+        for(u_int k=0;k<pointstofillcoord.size();k++){
+          CanvasPoint current = pointstofillcoord[k];
+          if(((int)current.x >= 0) && ((int)current.x < WIDTH) && ((int)current.y >= 0) && ((int)current.y < HEIGHT) )
+          {
+            if(current.depth > buffer[(int)current.x][(int)current.y]){
+              buffer[(int)current.x][(int)current.y] = current.depth;
+              window.setPixelColour((int)current.x, (int)current.y, colour);
+            }
+          }
+      }
+  }
+    for (u_int i = 0; i < points4to3coord.size(); i++) {
+        pointstofillcoord = interpolation2(points4to3coord[i],points2to3coord[i],abs(points4to3coord[i].x-points2to3coord[i].x));
+          for(u_int k=0;k<pointstofillcoord.size();k++){
+            CanvasPoint current = pointstofillcoord[k];
+            if((current.x >= 0) && ((int)current.x < WIDTH) && ((int)current.y >= 0) && ((int)current.y < HEIGHT) )
+            {
+              if(current.depth > buffer[(int)current.x][(int)current.y]){
+                buffer[(int)current.x][(int)current.y] = current.depth;
+                window.setPixelColour((int)current.x, (int)current.y, colour);
+              }
+            }
+        }
+    }
+  }
+}
+
 int main(int argc, char* argv[])
 {
   SDL_Event event;
-  drawWireframes();
+  bufferting();
   while(true)
   {
     if(window.pollForInputEvents(&event)) handleEvent(event);
@@ -371,7 +465,8 @@ void draw()
 
 void greyscale() {
     window.clearPixels();
-    vector<float> values = interpolation(0, 255, window.width);
+    vector<double> values = interpolation(0, 255, window.width);
+    // vector<float> values = interpolation(0, 255, window.width);
     for (int x = 0; x < window.width; x++) {
       uint32_t colour = (255<<24) + (int(255 - values[x])<<16) + (int(255 - values[x])<<8) + int(255 - values[x]);
       for (int y = 0; y < window.height; y++) {
