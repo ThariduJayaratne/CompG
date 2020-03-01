@@ -10,8 +10,10 @@ using namespace std;
 
 using namespace glm;
 
-#define WIDTH 480
-#define HEIGHT 395
+#define WIDTH 1000
+#define HEIGHT 1000
+#define PI 3.14159265
+#define SCALETING 0.5
 
 void draw();
 void greyscale();
@@ -19,6 +21,8 @@ void update();
 void handleEvent(SDL_Event event);
 
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
+mat3 camOrien = mat3();
+vec3 camera = vec3(0,0,6);
 
 // vector<float> interpolation(float from, float to, int n) {
 //   vector<float> list;
@@ -48,12 +52,12 @@ vector<vec3> interpolation3(vec3 from, vec3 to, int n) {
   return list;
 }
 
-vector<CanvasPoint> interpolation2(CanvasPoint from, CanvasPoint to, float n) {
+vector<CanvasPoint> interpolation2(CanvasPoint from, CanvasPoint to, int n) {
   vector<CanvasPoint> list;
-  float stepx = (to.x - from.x)/(n - 1);
-  float stepy = (to.y - from.y)/(n - 1);
-  double stepDepth = (to.depth - from.depth)/(n - 1);
-  for(float i = 0; i < n; i++) {
+  float stepx = (to.x - from.x)/(n);//n-1
+  float stepy = (to.y - from.y)/(n);
+  double stepDepth = (to.depth - from.depth)/(n);
+  for(int i = 0; i <= n; i++) {
     CanvasPoint pt;
     pt.x = from.x + i * stepx;
     pt.y = from.y + i * stepy;
@@ -62,6 +66,7 @@ vector<CanvasPoint> interpolation2(CanvasPoint from, CanvasPoint to, float n) {
   }
   return list;
 }
+
 
 void colorscale(){
   window.clearPixels();
@@ -133,7 +138,7 @@ vector<Colour> readmat(){
   return result;
 }
 
-vector<vec3> readVertices(){
+vector<vec3> readVertices(float scale){
   ifstream myfile;
   myfile.open("cornell-box.obj");
   std::string line;
@@ -141,9 +146,9 @@ vector<vec3> readVertices(){
   while (getline(myfile, line)) {
     std::string* lineX = split(line,' ');
     if(line[0] == 'v'){
-      float xc = stof(lineX[1]);
-      float yc = stof(lineX[2]);
-      float zc = stof(lineX[3]);
+      float xc = stof(lineX[1])*scale;
+      float yc = stof(lineX[2])*scale;
+      float zc = stof(lineX[3])*scale;
       vertices.push_back(vec3(xc,yc,zc));
     }
   }
@@ -155,7 +160,7 @@ vector<ModelTriangle> readtriangles(){
   myfile.open("cornell-box.obj");
   std::string line;
   vector<ModelTriangle> triangles;
-  vector<vec3> readvertices = readVertices();
+  vector<vec3> readvertices = readVertices(SCALETING);
   Colour colour;
   vector<Colour> colours = readmat();
   while (getline(myfile, line)) {
@@ -219,9 +224,9 @@ void filltriangle(CanvasPoint point1, CanvasPoint point2, CanvasPoint point3, ui
   }
 }
 
-vector<CanvasTriangle> drawWireframes(){
-  vec3 camera = vec3(0,0,6);
-  float f = 250;
+vector<CanvasTriangle> drawWireframes(vec3 camera){
+  // vec3 camera = vec3(0,0,6);
+  float f = 3;
   vector<ModelTriangle> triangles = readtriangles();
   vector<CanvasTriangle> canvastriangles;
   for(u_int i=0;i<triangles.size();i++){
@@ -238,38 +243,89 @@ vector<CanvasTriangle> drawWireframes(){
     test2.depth = triangles[i].vertices[1].z;
     test3.depth = triangles[i].vertices[2].z;
 
+    int canvasScale = 100;
     //PERSPECTIVE
     cameraP1x = test1.x - camera.x;
     cameraP1y = test1.y - camera.y;
     cameraP1z = test1.depth - camera.z;
+
+    vec3 camPer1 = vec3(cameraP1x,cameraP1y,cameraP1z);
+    vec3 adjustedPos1 = camPer1 * camOrien;
     //PROJECTION
-    float p1Screen = f/-cameraP1z;
-    int P1XProj = (cameraP1x * p1Screen) + WIDTH/2;
-    int P1YProj = ((1 - cameraP1y) * p1Screen) + HEIGHT/2;
+    float p1Screen = f/-adjustedPos1.z;
+    int P1XProj = (adjustedPos1.x * p1Screen * canvasScale) + WIDTH/2;
+    int P1YProj = ((1 - adjustedPos1.y) * p1Screen * canvasScale) + HEIGHT/2;
     projP1.x = P1XProj;
     projP1.y = P1YProj;
-    projP1.depth = 1/-(cameraP1z);
+    projP1.depth = 1/-(adjustedPos1.z);
+
 
     cameraP2x = test2.x - camera.x;
     cameraP2y = test2.y - camera.y;
     cameraP2z = test2.depth - camera.z;
-    float p2Screen = f/-cameraP2z;
-    int P2XProj = (cameraP2x * p2Screen) + WIDTH/2;
-    int P2YProj = ((1 - cameraP2y) * p2Screen) + HEIGHT/2;
+
+    vec3 camPer2 = vec3(cameraP2x,cameraP2y,cameraP2z);
+    vec3 adjustedPos2 = camPer2 * camOrien;
+
+    float p2Screen = f/-adjustedPos2.z;
+    int P2XProj = (adjustedPos2.x * p2Screen * canvasScale) + WIDTH/2;
+    int P2YProj = ((1 - adjustedPos2.y) * p2Screen  * canvasScale) + HEIGHT/2;
     projP2.x = P2XProj;
     projP2.y = P2YProj;
-    projP2.depth = 1/-(cameraP2z);
+    projP2.depth = 1/-(adjustedPos2.z);
 
 
     cameraP3x = test3.x - camera.x;
     cameraP3y = test3.y - camera.y;
     cameraP3z = test3.depth - camera.z;
-    float p3Screen = f/-cameraP3z;
-    int P3XProj = (cameraP3x * p3Screen) + WIDTH/2;
-    int P3YProj = ((1 - cameraP3y) * p3Screen) + HEIGHT/2;
+
+    vec3 camPer3 = vec3(cameraP3x,cameraP3y,cameraP3z);
+    vec3 adjustedPos3 = camPer3 * camOrien;
+
+    float p3Screen = f/-adjustedPos3.z;
+    int P3XProj = (adjustedPos3.x * p3Screen  * canvasScale) + WIDTH/2;
+    int P3YProj = ((1 - adjustedPos3.y) * p3Screen  * canvasScale) + HEIGHT/2;
     projP3.x = P3XProj;
     projP3.y = P3YProj;
-    projP3.depth = 1/-(cameraP3z);
+    projP3.depth = 1/-(adjustedPos3.z);
+
+
+
+    // cameraP1x = test1.x - camera.x;
+    // cameraP1y = test1.y - camera.y;
+    // cameraP1z = test1.depth - camera.z;
+    // vec3 camPer1 = vec3(cameraP1x,cameraP1y,cameraP1z);
+    // vec3 adjustedPos1 = camPer1 * camOrien;
+    // float p1Screen = f/-cameraP1z;
+    // int P1XProj = (cameraP1x * p1Screen) + WIDTH/2;
+    // int P1YProj = ((- cameraP1y) * p1Screen) + HEIGHT/2;
+    // projP1.x = P1XProj;
+    // projP1.y = P1YProj;
+    // projP1.depth = 1/-(cameraP1z);
+    //
+    //
+    //
+    // cameraP2x = test2.x - camera.x;
+    // cameraP2y = test2.y - camera.y;
+    // cameraP2z = test2.depth - camera.z;
+    // float p2Screen = f/-cameraP2z;
+    // int P2XProj = (cameraP2x * p2Screen) + WIDTH/2;
+    // int P2YProj = ((- cameraP2y) * p2Screen) + HEIGHT/2;
+    // projP2.x = P2XProj;
+    // projP2.y = P2YProj;
+    // projP2.depth = 1/-(cameraP2z);
+    //
+    //
+    // cameraP3x = test3.x - camera.x;
+    // cameraP3y = test3.y - camera.y;
+    // cameraP3z = test3.depth - camera.z;
+    // float p3Screen = f/-cameraP3z;
+    // int P3XProj = (cameraP3x * p3Screen) + WIDTH/2;
+    // int P3YProj = ((- cameraP3y) * p3Screen) + HEIGHT/2;
+    // projP3.x = P3XProj;
+    // projP3.y = P3YProj;
+    // projP3.depth = 1/-(cameraP3z);
+
 
 
     canvastriangles.push_back(CanvasTriangle(projP1,projP2,projP3,triangles[i].colour));
@@ -312,9 +368,9 @@ vector<uint32_t> loadImg(){
   return pixeldata;
 }
 
-void bufferting(){
+void bufferting(vec3 camera){
   double **buffer = malloc2dArray(WIDTH,HEIGHT);
-  vector<CanvasTriangle> canvastriangles = drawWireframes();
+  vector<CanvasTriangle> canvastriangles = drawWireframes(camera);
   for(u_int y=0; y<HEIGHT ;y++){
     for(u_int x=0; x<WIDTH ;x++){
       buffer[x][y] = -INFINITY;
@@ -347,18 +403,23 @@ void bufferting(){
         point3 = temp;
       }
     }
-    float x = ((point3.x - point1.x)*(point2.y - point1.y))/(point3.y - point1.y);
+    // float x = ((point3.x - point1.x)*(point2.y - point1.y))/(point3.y - point1.y);
     double ratio = (point3.y - point2.y)/(point3.y - point1.y);
-    double point4Depth = point1.depth - ratio * (point3.depth - point1.depth);
-    CanvasPoint point4 = CanvasPoint(round(point1.x + x), point2.y,point4Depth);
-    vector<CanvasPoint> points1to4coord = interpolation2(point1,point4,(point4.y-point1.y));
-    vector<CanvasPoint> points1to2coord = interpolation2(point1,point2,(point2.y-point1.y));
-    vector<CanvasPoint> points4to3coord = interpolation2(point4,point3,(point3.y-point4.y));
-    vector<CanvasPoint> points2to3coord = interpolation2(point2,point3,(point3.y-point2.y));
+    double point4Depth = point3.depth - ratio * (point3.depth - point1.depth);
+    CanvasPoint point4 = CanvasPoint(point3.x - ratio * (point3.x - point1.x), point3.y - ratio * (point3.y - point1.y),point4Depth);
+    vector<CanvasPoint> points1to4coord = interpolation2(point1,point4,(point2.y-point1.y)+1);
+    vector<CanvasPoint> points1to2coord = interpolation2(point1,point2,(point2.y-point1.y)+1);
+    vector<CanvasPoint> points4to3coord = interpolation2(point4,point3,(point3.y-point2.y)+1);
+    vector<CanvasPoint> points2to3coord = interpolation2(point2,point3,(point3.y-point2.y)+1);
+    // vector<CanvasPoint> points4to2coord = interpolation2(point4,point2,abs(point2.x-point4.x)+1);
     vector<CanvasPoint> pointstofillcoord;
+    // float numberOfSteps1 = std::max(points1to4coord.size(), points1to2coord.size());
+    // float numberOfSteps2 = std::max(points4to3coord.size(), points2to3coord.size());
+
 
     for (u_int i = 0; i < points1to4coord.size(); i++) {
-        pointstofillcoord = interpolation2(points1to4coord[i],points1to2coord[i],abs(points1to4coord[i].x-points1to2coord[i].x));
+      // for (u_int j = 0; j < points1to2coord.size(); j++) {
+        pointstofillcoord = interpolation2(points1to4coord[i],points1to2coord[i],abs(points1to4coord[i].x-points1to2coord[i].x)+1);
         for(u_int k=0;k<pointstofillcoord.size();k++){
           CanvasPoint current = pointstofillcoord[k];
           if(((int)current.x >= 0) && ((int)current.x < WIDTH) && ((int)current.y >= 0) && ((int)current.y < HEIGHT) )
@@ -369,9 +430,12 @@ void bufferting(){
             }
           }
       }
-  }
+  // }
+}
+
     for (u_int i = 0; i < points4to3coord.size(); i++) {
-        pointstofillcoord = interpolation2(points4to3coord[i],points2to3coord[i],abs(points4to3coord[i].x-points2to3coord[i].x));
+      // for (u_int j = 0; j < points2to3coord.size(); j++) {
+        pointstofillcoord = interpolation2(points4to3coord[i],points2to3coord[i],abs(points4to3coord[i].x-points2to3coord[i].x)+1);
           for(u_int k=0;k<pointstofillcoord.size();k++){
             CanvasPoint current = pointstofillcoord[k];
             if((current.x >= 0) && ((int)current.x < WIDTH) && ((int)current.y >= 0) && ((int)current.y < HEIGHT) )
@@ -383,16 +447,20 @@ void bufferting(){
             }
         }
     }
+  // }
   }
 }
 
 int main(int argc, char* argv[])
 {
   SDL_Event event;
-  bufferting();
   while(true)
   {
-    if(window.pollForInputEvents(&event)) handleEvent(event);
+    if(window.pollForInputEvents(&event)){
+      handleEvent(event);
+      window.clearPixels();
+      bufferting(camera);
+    }
     window.renderFrame();
   }
 }
@@ -473,13 +541,53 @@ void update()
   // Function for performing animation (shifting artifacts or moving the camera)
 }
 
+void rotateX(vec3 camera, float angle){
+  mat3 rotationMatrix(vec3(1.0,0.0,0.0),
+  vec3(0,cos(angle),-sin(angle)),
+  vec3(0,sin(angle),cos(angle)));
+  camOrien = camOrien * rotationMatrix;
+}
+void rotateY(vec3 camera, float angle){
+  mat3 rotationMatrix(vec3(cos(angle),0,sin(angle)),
+  vec3(0,1,0),
+  vec3(-sin(angle),0,cos(angle)));
+  camOrien = camOrien * rotationMatrix;
+}
+void rotateZ(vec3 camera, float angle){
+  mat3 rotationMatrix(vec3(cos(angle),-sin(angle),0),
+  vec3(sin(angle),cos(angle),0),
+  vec3(0,0,1));
+  camOrien = camOrien * rotationMatrix;
+}
+
+float angle = 0.1f;
 void handleEvent(SDL_Event event)
 {
   if(event.type == SDL_KEYDOWN) {
-    if(event.key.keysym.sym == SDLK_LEFT) cout << "LEFT" << endl;
-    else if(event.key.keysym.sym == SDLK_RIGHT) cout << "RIGHT" << endl;
-    else if(event.key.keysym.sym == SDLK_UP) cout << "UP" << endl;
-    else if(event.key.keysym.sym == SDLK_DOWN) cout << "DOWN" << endl;
+    if(event.key.keysym.sym == SDLK_LEFT){
+      cout << "LEFT" << endl;
+      camera.x += 1;
+    }
+    else if(event.key.keysym.sym == SDLK_RIGHT){
+      cout << "RIGHT" << endl;
+      camera.x -= 1;
+    }
+    else if(event.key.keysym.sym == SDLK_UP) {
+      cout << "UP" << endl;
+      camera.y -= 1;
+    }
+    else if(event.key.keysym.sym == SDLK_DOWN){
+      cout << "DOWN" << endl;
+      camera.y += 1;
+    }
+    else if(event.key.keysym.sym == SDLK_w){
+      cout << "FORWARD" << endl;
+      camera.z -= 1;
+    }
+    else if(event.key.keysym.sym == SDLK_s){
+      cout << "BACKWARD" << endl;
+      camera.z += 1;
+    }
     else if(event.key.keysym.sym == SDLK_u) {
       CanvasPoint p1 = CanvasPoint(rand() % 480, rand() % 395);
       CanvasPoint p2 = CanvasPoint(rand() % 480, rand() % 395);
@@ -504,7 +612,19 @@ void handleEvent(SDL_Event event)
       CanvasPoint p3 = CanvasPoint(rand() % 480, rand() % 395);
       texturetriangle(p1,p2,p3);
     }
-
+    else if(event.key.keysym.sym == SDLK_x) {
+      rotateX(camera,angle);
+    }
+    else if(event.key.keysym.sym == SDLK_y) {
+      rotateY(camera,angle);
+    }
+    else if(event.key.keysym.sym == SDLK_z) {
+      rotateZ(camera,angle);
+    }
+    else if(event.key.keysym.sym == SDLK_r) {
+      camera = vec3(0,0,6);
+      camOrien = mat3();
+    }
   }
   else if(event.type == SDL_MOUSEBUTTONDOWN) cout << "MOUSE CLICKED" << endl;
 }
