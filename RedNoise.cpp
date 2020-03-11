@@ -289,8 +289,6 @@ vector<CanvasTriangle> drawWireframes(vec3 camera){
     projP3.y = P3YProj;
     projP3.depth = 1/-(adjustedPos3.z);
 
-
-
     // cameraP1x = test1.x - camera.x;
     // cameraP1y = test1.y - camera.y;
     // cameraP1z = test1.depth - camera.z;
@@ -332,6 +330,7 @@ vector<CanvasTriangle> drawWireframes(vec3 camera){
   }
   return canvastriangles;
 }
+
 double **malloc2dArray(int dim1, int dim2) {
     double **array = (double **) malloc(dim1 * sizeof(double *));
     for (int i = 0; i < dim1; i++) {
@@ -369,6 +368,7 @@ vector<uint32_t> loadImg(){
 }
 
 void bufferting(vec3 camera){
+
   double **buffer = malloc2dArray(WIDTH,HEIGHT);
   vector<CanvasTriangle> canvastriangles = drawWireframes(camera);
   for(u_int y=0; y<HEIGHT ;y++){
@@ -376,6 +376,7 @@ void bufferting(vec3 camera){
       buffer[x][y] = -INFINITY;
     }
   }
+
   for(u_int i=0;i<canvastriangles.size();i++){
     CanvasPoint point1 = canvastriangles[i].vertices[0];
     CanvasPoint point2 = canvastriangles[i].vertices[1];
