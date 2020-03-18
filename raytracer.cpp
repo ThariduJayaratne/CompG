@@ -25,7 +25,6 @@ DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
 mat3 camOrien = mat3();
 vec3 camera = vec3(0,0,6);
 
-
 vector<Colour> readmat(){
   ifstream myfile;
   myfile.open("cornell-box.mtl");
@@ -110,11 +109,10 @@ vector<ModelTriangle> readtriangles(){
 }
 
 vec3 rayDir(int x, int y){
-  vec3 dir = normalize(vec3(x-WIDTH/2, y-HEIGHT/2,500)-camera)*camOrien;
+  vec3 dir = normalize(vec3(x-WIDTH/2, -(y-HEIGHT/2),-500)-camera)*camOrien;
   return dir;
 }
-RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDirection){
-  vector<ModelTriangle> triangles = readtriangles();
+RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDirection, vector<ModelTriangle> triangles){
   RayTriangleIntersection intersectionP;
   intersectionP.distanceFromCamera = INFINITY;
   for(u_int i=0;i<triangles.size();i++){
@@ -133,28 +131,27 @@ RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDire
         intersectionP.intersectionPoint = triangles[i].vertices[0] + (u*e0) + (v*e1);
       }
     }
-    if(intersectionP.distanceFromCamera == INFINITY){
-      intersectionP.distanceFromCamera = -999;
-    }
+  }
+  if(intersectionP.distanceFromCamera == INFINITY){
+    intersectionP.distanceFromCamera = -INFINITY;
   }
   return intersectionP;
 }
 
 void computeRayT(){
+  vector<ModelTriangle> triangles = readtriangles();
   for(int x=0;x<WIDTH;x++){
-    for(int y=0;y<HEIGHT;x++){
+    for(int y=0;y<HEIGHT;y++){
       vec3 dir = rayDir(x,y);
-      RayTriangleIntersection intersectP = getClosestIntersection(camera,dir);
+      RayTriangleIntersection intersectP = getClosestIntersection(camera,dir, triangles);
       Colour c = intersectP.intersectedTriangle.colour;
-      float red = c.red;
-      float green = c.green;
-      float blue = c.blue;
-      uint32_t colour = (255<<24) + (int(red)<<16) + (int(green)<<8) + int(blue);
-      if(intersectP.distanceFromCamera != -999){
-        window.setPixelColour((int)intersectP.intersectionPoint.x, (int)intersectP.intersectionPoint.y, colour);
+      uint32_t colour = (255<<24) + (int(c.red)<<16) + (int(c.green)<<8) + int(c.blue);
+      if(intersectP.distanceFromCamera != -INFINITY){
+        window.setPixelColour(x, y, colour);
       }
     }
   }
+  std::cout << "RAYTRACING FINISHED" << '\n';
 }
 
 void rotateX(vec3 camera, float angle){
@@ -179,12 +176,11 @@ void rotateZ(vec3 camera, float angle){
 int main(int argc, char* argv[])
 {
   SDL_Event event;
-  computeRayT();
+
   while(true)
   {
     if(window.pollForInputEvents(&event)){
       handleEvent(event);
-      window.clearPixels();
       // bufferting(camera);
     }
     window.renderFrame();
@@ -195,6 +191,7 @@ float angle = 0.1f;
 void handleEvent(SDL_Event event)
 {
   if(event.type == SDL_KEYDOWN) {
+    window.clearPixels();
     if(event.key.keysym.sym == SDLK_LEFT){
       cout << "LEFT" << endl;
       camera.x += 1;
@@ -220,7 +217,8 @@ void handleEvent(SDL_Event event)
       camera.z += 1;
     }
     else if(event.key.keysym.sym == SDLK_c) {
-      window.clearPixels();
+      // window.clearPixels();
+      computeRayT();
     }
     else if(event.key.keysym.sym == SDLK_x) {
       rotateX(camera,angle);
