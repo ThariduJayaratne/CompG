@@ -7,12 +7,13 @@
 #include <fstream>
 #include <vector>
 
+
 using namespace std;
 
 using namespace glm;
 
-#define WIDTH 1000
-#define HEIGHT 1000
+#define WIDTH 640
+#define HEIGHT 480
 #define PI 3.14159265
 #define SCALETING 0.5
 
@@ -176,10 +177,10 @@ void rotateZ(vec3 camera, float angle){
 int main(int argc, char* argv[])
 {
   SDL_Event event;
-
   while(true)
   {
     if(window.pollForInputEvents(&event)){
+      window.clearPixels();
       handleEvent(event);
       // bufferting(camera);
     }
@@ -191,7 +192,6 @@ float angle = 0.1f;
 void handleEvent(SDL_Event event)
 {
   if(event.type == SDL_KEYDOWN) {
-    window.clearPixels();
     if(event.key.keysym.sym == SDLK_LEFT){
       cout << "LEFT" << endl;
       camera.x += 1;
@@ -217,8 +217,7 @@ void handleEvent(SDL_Event event)
       camera.z += 1;
     }
     else if(event.key.keysym.sym == SDLK_c) {
-      // window.clearPixels();
-      computeRayT();
+      window.clearPixels();
     }
     else if(event.key.keysym.sym == SDLK_x) {
       rotateX(camera,angle);
