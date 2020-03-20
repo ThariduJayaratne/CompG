@@ -1,6 +1,7 @@
 #include <ModelTriangle.h>
 #include <CanvasTriangle.h>
 #include <DrawingWindow.h>
+#include <RayTriangleIntersection.h>
 #include <Utils.h>
 #include <glm/glm.hpp>
 #include <fstream>
@@ -18,10 +19,13 @@ using namespace glm;
 void handleEvent(SDL_Event event);
 
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
-
+int mode = 1; //1 -> Wireframe    2 -> Rasteriser    3 -> Raytracer
 mat3 camOrien = mat3();
 vec3 camera = vec3(0,0,6);
 float angle = 0.1f;
+
+vec3 whitelight = vec3(-0.242005 , 2.00925, -0.683984) * (float)SCALETING;
+
 
 double **malloc2dArray(int dim1, int dim2) {
     double **array = (double **) malloc(dim1 * sizeof(double *));
@@ -271,7 +275,6 @@ void draw3DWireframes(vector<CanvasTriangle> triangles) {
         }
       }
     }
-    // drawTriangle(triangles[i].vertices[0], triangles[i].vertices[1], triangles[i].vertices[2], colour);
   }
 }
 
@@ -424,6 +427,68 @@ vector<CanvasTriangle> modelToCanvas(vec3 camera, vector<ModelTriangle> triangle
   return canvastriangles;
 }
 
+vec3 rayDir(int x, int y) {
+  vec3 dir = normalize(vec3(x-WIDTH/2, -(y-HEIGHT/2),-500)-camera)*camOrien;
+  return dir;
+}
+
+RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDirection, vector<ModelTriangle> triangles) {
+  RayTriangleIntersection intersectionP;
+  intersectionP.distanceFromCamera = INFINITY;
+  for(u_int i=0;i<triangles.size();i++){
+    vec3 e0 = triangles[i].vertices[1] - triangles[i].vertices[0];
+    vec3 e1 = triangles[i].vertices[2] - triangles[i].vertices[0];
+    vec3 SPVector = cameraPosition - (triangles[i].vertices[0]);
+    mat3 DEMatrix(-rayDirection, e0, e1);
+    vec3 possibleSolution = inverse(DEMatrix) * SPVector;
+    float t = possibleSolution.x;
+    float u = possibleSolution.y;
+    float v = possibleSolution.z;
+    if ((u>= 0) & (u<=1) & (v>= 0) & (v<=1) & ((u+v)<=1)){
+      if (t < intersectionP.distanceFromCamera){
+        intersectionP.distanceFromCamera = t;
+        intersectionP.intersectedTriangle = triangles[i];
+        intersectionP.intersectionPoint = triangles[i].vertices[0] + (u*e0) + (v*e1);
+      }
+    }
+  }
+  return intersectionP;
+}
+
+bool inShadow(vec3 surfacePoint, vec3 lightSource, vector<ModelTriangle> triangles){
+  vec3 dir = normalize(lightSource - surfacePoint);
+  float distance = length(lightSource - surfacePoint);
+  RayTriangleIntersection pointX = getClosestIntersection(surfacePoint, dir, triangles);
+  if (pointX.distanceFromCamera < distance) return true;
+  return false;
+}
+
+void computeRayT(vector<ModelTriangle> triangles,vec3 whitelight){
+  for(int x=0;x<WIDTH;x++){
+    for(int y=0;y<HEIGHT;y++){
+      vec3 dir = rayDir(x,y);
+      RayTriangleIntersection intersectP = getClosestIntersection(camera, dir, triangles);
+      ModelTriangle trianglex = intersectP.intersectedTriangle;
+      vec3 normaltovertices = normalize(cross(trianglex.vertices[1]-trianglex.vertices[0],trianglex.vertices[2]-trianglex.vertices[0]));
+      Colour c = intersectP.intersectedTriangle.colour;
+      vec3 pToL = whitelight - intersectP.intersectionPoint;
+      float dotProd = normalize(dot(normaltovertices,pToL));
+      if(dotProd < 0.0f) dotProd = 0.0f;
+      float myDistance = length(pToL);
+      float brightness = (dotProd)/(0.5*M_PI* myDistance * myDistance);
+      if (inShadow(intersectP.intersectionPoint, whitelight, triangles)) {
+        brightness -= 0.1f;
+      }
+      if(brightness > 1.0f) brightness = 1.0f;
+      if(brightness < 0.05f) brightness = 0.05f;
+      uint32_t colour = (255<<24) + (int(c.red * brightness)<<16) + (int(c.green * brightness)<<8) + int(c.blue * brightness);
+      if(intersectP.distanceFromCamera != INFINITY){
+        window.setPixelColour(x, y, colour);
+      }
+    }
+  }
+}
+
 int main(int argc, char* argv[])
 {
 
@@ -435,8 +500,20 @@ int main(int argc, char* argv[])
     if(window.pollForInputEvents(&event)){
       handleEvent(event);
       window.clearPixels();
-      vector<CanvasTriangle> canvastriangles = modelToCanvas(camera, triangles, 5, 100);
-      draw3DWireframes(canvastriangles);
+      if (mode == 1) {
+        vector<CanvasTriangle> canvastriangles = modelToCanvas(camera, triangles, 5, 100);
+        draw3DWireframes(canvastriangles);
+      }
+
+      else if (mode == 2) {
+        vector<CanvasTriangle> canvastriangles = modelToCanvas(camera, triangles, 5, 100);
+        draw3DRasterisedTriangles(canvastriangles);
+      }
+
+      else if (mode == 3) {
+        computeRayT(triangles, whitelight);
+      }
+
     }
     window.renderFrame();
   }
@@ -490,21 +567,14 @@ void handleEvent(SDL_Event event)
       cout << "BACKWARD" << endl;
       camera.z += 0.1;
     }
-    else if(event.key.keysym.sym == SDLK_u) {
-      CanvasPoint p1 = CanvasPoint(rand() % WIDTH, rand() % HEIGHT);
-      CanvasPoint p2 = CanvasPoint(rand() % WIDTH, rand() % HEIGHT);
-      CanvasPoint p3 = CanvasPoint(rand() % WIDTH, rand() % HEIGHT);
-
-      uint32_t colour = (255<<24) + ((rand() % 256)<<16) + ((rand() % 256)<<8) + (rand() % 256);
-      drawTriangle(p1,p2,p3,colour);
+    else if(event.key.keysym.sym == SDLK_1) {
+      mode = 1;
     }
-    else if(event.key.keysym.sym == SDLK_f) {
-      cout<<"F"<<endl;
-      CanvasPoint p1 = CanvasPoint(rand() % WIDTH, rand() % HEIGHT);
-      CanvasPoint p2 = CanvasPoint(rand() % WIDTH, rand() % HEIGHT);
-      CanvasPoint p3 = CanvasPoint(rand() % WIDTH, rand() % HEIGHT);
-      uint32_t colour = (255<<24) + ((rand() % 256)<<16) + ((rand() % 256)<<8) + (rand() % 256);
-      drawFillTriangle(p1,p2,p3,colour);
+    else if(event.key.keysym.sym == SDLK_2) {
+      mode = 2;
+    }
+    else if(event.key.keysym.sym == SDLK_3) {
+      mode = 3;
     }
     else if(event.key.keysym.sym == SDLK_c) {
       window.clearPixels();
