@@ -418,8 +418,8 @@ vector<CanvasTriangle> modelToCanvas(vec3 camera, vector<ModelTriangle> triangle
     projP3.y = P3YProj;
     projP3.depth = 1/-(adjustedPos3.z);
 
-    Colour c = triangles[i].colour;
-    uint32_t colour = (255<<24) + (int(c.red)<<16) + (int(c.green)<<8) + int(c.blue);
+    // Colour c = triangles[i].colour;
+    // uint32_t colour = (255<<24) + (int(c.red)<<16) + (int(c.green)<<8) + int(c.blue);
 
     canvastriangles.push_back(CanvasTriangle(projP1,projP2,projP3,triangles[i].colour));
   }
@@ -432,13 +432,37 @@ vec3 rayDir(int x, int y) {
   return dir;
 }
 
+bool inShadow(vec3 surfacePoint, vec3 lightSource, vector<ModelTriangle> triangles, int index){
+  bool shadow = false;
+  vec3 dir = normalize(lightSource - surfacePoint);
+  float distance = length(dir);
+  for(u_int i=0;i<triangles.size();i++){
+    vec3 e0 = triangles[i].vertices[1] - triangles[i].vertices[0];
+    vec3 e1 = triangles[i].vertices[2] - triangles[i].vertices[0];
+    vec3 SPVector = surfacePoint - (triangles[i].vertices[0]);
+    mat3 DEMatrix(-dir, e0, e1);
+    vec3 possibleSolution = inverse(DEMatrix) * SPVector;
+    float t = possibleSolution.x;
+    float u = possibleSolution.y;
+    float v = possibleSolution.z;
+    if ((u>= 0) & (u<=1) & (v>= 0) & (v<=1) & ((u+v)<=1) & i != index){
+      if (t < distance){
+        shadow = true;
+        break;
+      }
+    }
+  }
+  return shadow;
+}
+
 RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDirection, vector<ModelTriangle> triangles) {
   RayTriangleIntersection intersectionP;
   intersectionP.distanceFromCamera = INFINITY;
   for(u_int i=0;i<triangles.size();i++){
-    vec3 e0 = triangles[i].vertices[1] - triangles[i].vertices[0];
-    vec3 e1 = triangles[i].vertices[2] - triangles[i].vertices[0];
-    vec3 SPVector = cameraPosition - (triangles[i].vertices[0]);
+    ModelTriangle triX = triangles[i];
+    vec3 e0 = triX.vertices[1] - triX.vertices[0];
+    vec3 e1 = triX.vertices[2] - triX.vertices[0];
+    vec3 SPVector = cameraPosition - (triX.vertices[0]);
     mat3 DEMatrix(-rayDirection, e0, e1);
     vec3 possibleSolution = inverse(DEMatrix) * SPVector;
     float t = possibleSolution.x;
@@ -449,19 +473,27 @@ RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDire
         intersectionP.distanceFromCamera = t;
         intersectionP.intersectedTriangle = triangles[i];
         intersectionP.intersectionPoint = triangles[i].vertices[0] + (u*e0) + (v*e1);
+        vec3 normaltovertices = normalize(cross(triX.vertices[1]-triX.vertices[0],triX.vertices[2]-triX.vertices[0]));
+        vec3 pToL = whitelight - intersectionP.intersectionPoint;
+        float dotProd = normalize(dot(normaltovertices,pToL));
+        if(dotProd < 0.0f) dotProd = 0.0f;
+        float myDistance = length(pToL);
+        float brightness = (dotProd)/(0.5*M_PI* myDistance * myDistance);
+        Colour c = intersectionP.intersectedTriangle.colour;
+        if(brightness > 1.0f) brightness = 1.0f;
+        if(brightness < 0.2f) brightness = 0.2f;
+        if(inShadow(intersectionP.intersectionPoint, whitelight,triangles,i)){
+          brightness = 0.15f;
+        }
+        intersectionP.intersectedTriangle.colour.red = c.red * brightness;
+        intersectionP.intersectedTriangle.colour.green = c.green * brightness;
+        intersectionP.intersectedTriangle.colour.blue = c.blue * brightness;
       }
     }
   }
   return intersectionP;
 }
 
-bool inShadow(vec3 surfacePoint, vec3 lightSource, vector<ModelTriangle> triangles){
-  vec3 dir = normalize(lightSource - surfacePoint);
-  float distance = length(lightSource - surfacePoint);
-  RayTriangleIntersection pointX = getClosestIntersection(surfacePoint, dir, triangles);
-  if (pointX.distanceFromCamera < distance) return true;
-  return false;
-}
 
 void computeRayT(vector<ModelTriangle> triangles,vec3 whitelight){
   for(int x=0;x<WIDTH;x++){
@@ -476,11 +508,8 @@ void computeRayT(vector<ModelTriangle> triangles,vec3 whitelight){
       if(dotProd < 0.0f) dotProd = 0.0f;
       float myDistance = length(pToL);
       float brightness = (dotProd)/(0.5*M_PI* myDistance * myDistance);
-      if (inShadow(intersectP.intersectionPoint, whitelight, triangles)) {
-        brightness -= 0.1f;
-      }
       if(brightness > 1.0f) brightness = 1.0f;
-      if(brightness < 0.05f) brightness = 0.05f;
+      if(brightness < 0.2f) brightness = 0.2f;
       uint32_t colour = (255<<24) + (int(c.red * brightness)<<16) + (int(c.green * brightness)<<8) + int(c.blue * brightness);
       if(intersectP.distanceFromCamera != INFINITY){
         window.setPixelColour(x, y, colour);
