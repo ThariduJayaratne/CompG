@@ -26,7 +26,28 @@ float angle = 0.1f;
 
 vec3 whitelight = vec3(-0.242005 , 2.00925, -0.683984) * (float)SCALETING;
 
-
+// struct sample{
+//   char r,g,b;
+// }
+//
+// void savePPM(){
+//   std:ofstream file("frame.ppm", std:ios::binary);
+//   file.write("P6 ",3);
+//   file.write("640 ",4);
+//   file.write("480",4);
+//   file.write("255 ",4);
+//
+//   for(int i = 0; i<WIDTH;i++){
+//     for(int j = 0; j<HEIGHT;j++){
+//       Sample s;
+//       uint32_t colour = getPixelColour(i,j);
+//       s.r = colour >> 24;
+//       s.g = colour >> 16;
+//       s.c = colour >> 8;
+//       file.write(reinterpret_cast<char*>(&s),sizeof(Sample));
+//     }
+//   }
+// }
 double **malloc2dArray(int dim1, int dim2) {
     double **array = (double **) malloc(dim1 * sizeof(double *));
     for (int i = 0; i < dim1; i++) {
@@ -470,6 +491,7 @@ RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDire
     float v = possibleSolution.z;
     if ((u>= 0) & (u<=1) & (v>= 0) & (v<=1) & ((u+v)<=1)){
       if (t < intersectionP.distanceFromCamera){
+        if((intersectionP.distanceFromCamera - t) > 0.05){
         intersectionP.distanceFromCamera = t;
         intersectionP.intersectedTriangle = triangles[i];
         intersectionP.intersectionPoint = triangles[i].vertices[0] + (u*e0) + (v*e1);
@@ -488,6 +510,7 @@ RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDire
         intersectionP.intersectedTriangle.colour.red = c.red * brightness;
         intersectionP.intersectedTriangle.colour.green = c.green * brightness;
         intersectionP.intersectedTriangle.colour.blue = c.blue * brightness;
+        }
       }
     }
   }
@@ -507,7 +530,7 @@ void computeRayT(vector<ModelTriangle> triangles,vec3 whitelight){
       float dotProd = normalize(dot(normaltovertices,pToL));
       if(dotProd < 0.0f) dotProd = 0.0f;
       float myDistance = length(pToL);
-      float brightness = (dotProd)/(0.5*M_PI* myDistance * myDistance);
+      float brightness = 2 * (dotProd)/(0.5*M_PI* myDistance * myDistance);
       if(brightness > 1.0f) brightness = 1.0f;
       if(brightness < 0.2f) brightness = 0.2f;
       uint32_t colour = (255<<24) + (int(c.red * brightness)<<16) + (int(c.green * brightness)<<8) + int(c.blue * brightness);
@@ -596,6 +619,33 @@ void handleEvent(SDL_Event event)
       cout << "BACKWARD" << endl;
       camera.z += 0.1;
     }
+
+
+    if(event.key.keysym.sym == SDLK_g){
+      whitelight.x -= 0.1;
+    }
+    else if(event.key.keysym.sym == SDLK_j){
+      whitelight.x += 0.1;
+    }
+    else if(event.key.keysym.sym == SDLK_y) {
+      whitelight.y += 0.1;
+    }
+    else if(event.key.keysym.sym == SDLK_h){
+      whitelight.y -= 0.1;
+    }
+    else if(event.key.keysym.sym == SDLK_n){
+      whitelight.z -= 0.1;
+    }
+    else if(event.key.keysym.sym == SDLK_b){
+      whitelight.z += 0.1;
+    }
+    else if(event.key.keysym.sym == SDLK_p){
+      cout << whitelight.x << ' ';
+      cout << whitelight.y << ' ';
+      cout << whitelight.z << ' ';
+    }
+
+
     else if(event.key.keysym.sym == SDLK_1) {
       mode = 1;
     }
