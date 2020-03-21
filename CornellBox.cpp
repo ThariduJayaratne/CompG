@@ -500,13 +500,13 @@ RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDire
         float dotProd = normalize(dot(normaltovertices,pToL));
         if(dotProd < 0.0f) dotProd = 0.0f;
         float myDistance = length(pToL);
-        float brightness = (dotProd)/(0.5*M_PI* myDistance * myDistance);
+        float brightness = 2*(dotProd)/(0.5*M_PI* myDistance * myDistance);
         Colour c = intersectionP.intersectedTriangle.colour;
+        if(inShadow(intersectionP.intersectionPoint, whitelight,triangles,i)){
+          brightness -= 0.6f;
+        }
         if(brightness > 1.0f) brightness = 1.0f;
         if(brightness < 0.2f) brightness = 0.2f;
-        if(inShadow(intersectionP.intersectionPoint, whitelight,triangles,i)){
-          brightness = 0.15f;
-        }
         intersectionP.intersectedTriangle.colour.red = c.red * brightness;
         intersectionP.intersectedTriangle.colour.green = c.green * brightness;
         intersectionP.intersectedTriangle.colour.blue = c.blue * brightness;
@@ -571,24 +571,34 @@ int main(int argc, char* argv[])
   }
 }
 
-void rotateX(vec3 camera, float angle){
+void rotateX(float angle){
   mat3 rotationMatrix(vec3(1.0,0.0,0.0),
   vec3(0,cos(angle),-sin(angle)),
   vec3(0,sin(angle),cos(angle)));
   camOrien = camOrien * rotationMatrix;
 }
 
-void rotateY(vec3 camera, float angle){
+void rotateY(float angle){
   mat3 rotationMatrix(vec3(cos(angle),0,sin(angle)),
   vec3(0,1,0),
   vec3(-sin(angle),0,cos(angle)));
   camOrien = camOrien * rotationMatrix;
 }
 
-void rotateZ(vec3 camera, float angle){
+void rotateZ(float angle){
   mat3 rotationMatrix(vec3(cos(angle),-sin(angle),0),
   vec3(sin(angle),cos(angle),0),
   vec3(0,0,1));
+  camOrien = camOrien * rotationMatrix;
+}
+
+void lookAt (vec3 camera, vec3 point) {
+  vec3 vertical = vec3(0, 1, 0);
+  vec3 forward = normalize(point - camera);
+  vec3 right = normalize(cross(vertical, forward));
+  vec3 up = normalize(cross(forward, right));
+  mat3 newCamOrien = mat3(forward, right, up);
+  mat3 rotationMatrix = inverse(camOrien) * newCamOrien;
   camOrien = camOrien * rotationMatrix;
 }
 
@@ -640,9 +650,9 @@ void handleEvent(SDL_Event event)
       whitelight.z += 0.1;
     }
     else if(event.key.keysym.sym == SDLK_p){
-      cout << whitelight.x << ' ';
-      cout << whitelight.y << ' ';
-      cout << whitelight.z << ' ';
+      cout << whitelight.x << endl;
+      cout << whitelight.y << endl;
+      cout << whitelight.z << endl;
     }
 
 
@@ -659,13 +669,16 @@ void handleEvent(SDL_Event event)
       window.clearPixels();
     }
     else if(event.key.keysym.sym == SDLK_x) {
-      rotateX(camera,angle);
+      rotateX(angle);
     }
     else if(event.key.keysym.sym == SDLK_y) {
-      rotateY(camera,angle);
+      rotateY(angle);
     }
     else if(event.key.keysym.sym == SDLK_z) {
-      rotateZ(camera,angle);
+      rotateZ(angle);
+    }
+    else if(event.key.keysym.sym == SDLK_l) {
+      lookAt(camera, whitelight);
     }
     else if(event.key.keysym.sym == SDLK_r) {
       camera = vec3(0,0,6);
