@@ -26,28 +26,23 @@ float angle = 0.1f;
 
 vec3 whitelight = vec3(-0.242005 , 2.00925, -0.683984) * (float)SCALETING;
 
-// struct sample{
-//   char r,g,b;
-// }
-//
-// void savePPM(){
-//   std:ofstream file("frame.ppm", std:ios::binary);
-//   file.write("P6 ",3);
-//   file.write("640 ",4);
-//   file.write("480",4);
-//   file.write("255 ",4);
-//
-//   for(int i = 0; i<WIDTH;i++){
-//     for(int j = 0; j<HEIGHT;j++){
-//       Sample s;
-//       uint32_t colour = getPixelColour(i,j);
-//       s.r = colour >> 24;
-//       s.g = colour >> 16;
-//       s.c = colour >> 8;
-//       file.write(reinterpret_cast<char*>(&s),sizeof(Sample));
-//     }
-//   }
-// }
+void savePPM(){
+  std::ofstream file("frame.ppm", std::ofstream::out | std::ofstream::trunc);
+  file << "P6\n";
+  file << "640 480\n";
+  file << "255\n";
+
+  for(int i = 0; i<HEIGHT;i++){
+    for(int j = 0; j<WIDTH;j++){
+      uint32_t colour = window.getPixelColour(j,i);
+      int r = (colour >> 16) & 255;
+      int g = (colour >> 8) & 255;
+      int b = (colour) & 255;
+      file << (u8) r << (u8) g << (u8) b;
+    }
+  }
+  file.close();
+}
 double **malloc2dArray(int dim1, int dim2) {
     double **array = (double **) malloc(dim1 * sizeof(double *));
     for (int i = 0; i < dim1; i++) {
@@ -500,13 +495,13 @@ RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDire
         float dotProd = normalize(dot(normaltovertices,pToL));
         if(dotProd < 0.0f) dotProd = 0.0f;
         float myDistance = length(pToL);
-        float brightness = 2*(dotProd)/(0.5*M_PI* myDistance * myDistance);
+        float brightness = (dotProd)/(0.5*M_PI* myDistance * myDistance);
         Colour c = intersectionP.intersectedTriangle.colour;
-        if(inShadow(intersectionP.intersectionPoint, whitelight,triangles,i)){
-          brightness -= 0.6f;
-        }
         if(brightness > 1.0f) brightness = 1.0f;
         if(brightness < 0.2f) brightness = 0.2f;
+        if(inShadow(intersectionP.intersectionPoint, whitelight,triangles,i)){
+          brightness = 0.15f;
+        }
         intersectionP.intersectedTriangle.colour.red = c.red * brightness;
         intersectionP.intersectedTriangle.colour.green = c.green * brightness;
         intersectionP.intersectedTriangle.colour.blue = c.blue * brightness;
@@ -541,6 +536,15 @@ void computeRayT(vector<ModelTriangle> triangles,vec3 whitelight){
   }
 }
 
+void lookAt (vec3 camera, vec3 point) {
+  vec3 vertical = vec3(0, 1, 0);
+  vec3 forward = normalize(camera - point);
+  vec3 right = normalize(cross(vertical, forward));
+  vec3 up = normalize(cross(forward, right));
+  mat3 newCamOrien = mat3(right, up,forward);
+  camOrien = inverse(transpose(newCamOrien));
+}
+
 int main(int argc, char* argv[])
 {
 
@@ -555,6 +559,9 @@ int main(int argc, char* argv[])
       if (mode == 1) {
         vector<CanvasTriangle> canvastriangles = modelToCanvas(camera, triangles, 5, 100);
         draw3DWireframes(canvastriangles);
+        // lookAt(camera,vec3(0,0,0));
+        // vector<CanvasTriangle> canvastriangles = modelToCanvas(camera, triangles, 5, 100);
+        // draw3DRasterisedTriangles(canvastriangles);
       }
 
       else if (mode == 2) {
@@ -565,7 +572,6 @@ int main(int argc, char* argv[])
       else if (mode == 3) {
         computeRayT(triangles, whitelight);
       }
-
     }
     window.renderFrame();
   }
@@ -592,15 +598,6 @@ void rotateZ(float angle){
   camOrien = camOrien * rotationMatrix;
 }
 
-void lookAt (vec3 camera, vec3 point) {
-  vec3 vertical = vec3(0, 1, 0);
-  vec3 forward = normalize(point - camera);
-  vec3 right = normalize(cross(vertical, forward));
-  vec3 up = normalize(cross(forward, right));
-  mat3 newCamOrien = mat3(forward, right, up);
-  mat3 rotationMatrix = inverse(camOrien) * newCamOrien;
-  camOrien = camOrien * rotationMatrix;
-}
 
 void handleEvent(SDL_Event event)
 {
@@ -650,11 +647,13 @@ void handleEvent(SDL_Event event)
       whitelight.z += 0.1;
     }
     else if(event.key.keysym.sym == SDLK_p){
-      cout << whitelight.x << endl;
-      cout << whitelight.y << endl;
-      cout << whitelight.z << endl;
+      cout << whitelight.x << ' ';
+      cout << whitelight.y << ' ';
+      cout << whitelight.z << ' ';
     }
-
+    else if(event.key.keysym.sym == SDLK_v){
+      savePPM();
+    }
 
     else if(event.key.keysym.sym == SDLK_1) {
       mode = 1;
@@ -676,9 +675,6 @@ void handleEvent(SDL_Event event)
     }
     else if(event.key.keysym.sym == SDLK_z) {
       rotateZ(angle);
-    }
-    else if(event.key.keysym.sym == SDLK_l) {
-      lookAt(camera, whitelight);
     }
     else if(event.key.keysym.sym == SDLK_r) {
       camera = vec3(0,0,6);
