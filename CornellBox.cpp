@@ -43,6 +43,7 @@ void savePPM(){
   }
   file.close();
 }
+
 double **malloc2dArray(int dim1, int dim2) {
     double **array = (double **) malloc(dim1 * sizeof(double *));
     for (int i = 0; i < dim1; i++) {
@@ -474,7 +475,7 @@ bool inShadow(vec3 surfacePoint, vec3 lightSource, vector<ModelTriangle> triangl
 RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDirection, vector<ModelTriangle> triangles) {
   RayTriangleIntersection intersectionP;
   intersectionP.distanceFromCamera = INFINITY;
-  for(u_int i=0;i<triangles.size();i++){
+  for(u_int i = 0; i < triangles.size(); i++){
     ModelTriangle triX = triangles[i];
     vec3 e0 = triX.vertices[1] - triX.vertices[0];
     vec3 e1 = triX.vertices[2] - triX.vertices[0];
@@ -495,7 +496,7 @@ RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDire
         float dotProd = normalize(dot(normaltovertices,pToL));
         if(dotProd < 0.0f) dotProd = 0.0f;
         float myDistance = length(pToL);
-        float brightness = (dotProd)/(0.5*M_PI* myDistance * myDistance);
+        float brightness = 5 * (dotProd)/(0.5*M_PI* myDistance * myDistance);
         Colour c = intersectionP.intersectedTriangle.colour;
         if(brightness > 1.0f) brightness = 1.0f;
         if(brightness < 0.2f) brightness = 0.2f;
@@ -525,7 +526,7 @@ void computeRayT(vector<ModelTriangle> triangles,vec3 whitelight){
       float dotProd = normalize(dot(normaltovertices,pToL));
       if(dotProd < 0.0f) dotProd = 0.0f;
       float myDistance = length(pToL);
-      float brightness = 2 * (dotProd)/(0.5*M_PI* myDistance * myDistance);
+      float brightness = 5 * (dotProd)/(0.5*M_PI* myDistance * myDistance);
       if(brightness > 1.0f) brightness = 1.0f;
       if(brightness < 0.2f) brightness = 0.2f;
       uint32_t colour = (255<<24) + (int(c.red * brightness)<<16) + (int(c.green * brightness)<<8) + int(c.blue * brightness);
@@ -675,6 +676,9 @@ void handleEvent(SDL_Event event)
     }
     else if(event.key.keysym.sym == SDLK_z) {
       rotateZ(angle);
+    }
+    else if(event.key.keysym.sym == SDLK_l) {
+      lookAt(camera, whitelight);
     }
     else if(event.key.keysym.sym == SDLK_r) {
       camera = vec3(0,0,6);

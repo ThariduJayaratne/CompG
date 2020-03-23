@@ -1,4 +1,4 @@
-PROJECT_NAME = CornellBox
+PROJECT_NAME = hackspace
 
 # Define the names of key files
 SOURCE_FILE = $(PROJECT_NAME).cpp

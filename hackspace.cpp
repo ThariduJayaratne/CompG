@@ -6,9 +6,9 @@
 #include <glm/glm.hpp>
 #include <fstream>
 #include <vector>
-#include <string>
 
 using namespace std;
+
 using namespace glm;
 
 #define WIDTH 640
@@ -17,10 +17,13 @@ using namespace glm;
 #define SCALETING 0.5
 
 void handleEvent(SDL_Event event);
+
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
+int mode = 1; //1 -> Wireframe    2 -> Rasteriser    3 -> Raytracer
 mat3 camOrien = mat3();
 vec3 camera = vec3(0,0,6);
 float angle = 0.1f;
+vec3 whitelight = vec3(-0.242005 , 2.00925, -0.683984) * (float)SCALETING;
 
 
 vector<CanvasPoint> interpolation2(CanvasPoint from, CanvasPoint to, int n) {
@@ -37,7 +40,15 @@ vector<CanvasPoint> interpolation2(CanvasPoint from, CanvasPoint to, int n) {
   }
   return list;
 }
-//GET VERTICES
+
+double **malloc2dArray(int dim1, int dim2) {
+    double **array = (double **) malloc(dim1 * sizeof(double *));
+    for (int i = 0; i < dim1; i++) {
+        array[i] = (double *) malloc(dim2 * sizeof(double));
+    }
+    return array;
+}
+
 vector<vec3> readVertices(float scale, string filename){
   ifstream myfile;
   myfile.open(filename);
@@ -52,18 +63,24 @@ vector<vec3> readVertices(float scale, string filename){
       vertices.push_back(vec3(xc,yc,zc));
     }
   }
+  //  for(u_int i=0; i<vertices.size(); i++) {
+  //    std::cout << vertices[i].x << endl;
+  //    std::cout << vertices[i].y << endl;
+  //    std::cout << vertices[i].z << endl;
+  // }
   return vertices;
 }
 
-//GET MODEL-TRIANGLES
 vector<ModelTriangle> readtriangles(string filename){
+  Colour c;
+  c.red = 255;
+  c.green = 0;
+  c.blue = 0;
   fstream myfile;
   myfile.open(filename);
   std::string line;
   vector<ModelTriangle> triangles;
   vector<vec3> readvertices = readVertices(SCALETING, filename);
-  Colour colour;
-  vector<Colour> colours = readmat();
   while (getline(myfile, line)) {
     string *splitLine = split(line, ' ');
     if(splitLine[0] == "f"){
@@ -76,96 +93,23 @@ vector<ModelTriangle> readtriangles(string filename){
       float p1 = stof(point1) - 1;
       float p2 = stof(point2) - 1;
       float p3 = stof(point3) - 1;
-      triangles.push_back(ModelTriangle(readvertices[p1], readvertices[p2], readvertices[p3], colour));
+      triangles.push_back(ModelTriangle(readvertices[p1], readvertices[p2], readvertices[p3], c));
     }
   }
   return triangles;
 }
 
-//GET TEXTURE POINTS
-vector<TexturePoint> readTexturePoints(string filename){
-  fstream myfile;
-  myfile.open(filename);
-  std::string line;
-  vector<TexturePoint> points;
-  TexturePoint p;
-  vector<Colour> colours = readmat();
-  while (getline(myfile, line)) {
-    string *splitLine = split(line, ' ');
-    if(splitLine[0] == "vt"){
-      p.x =  stof(splitLine[1]);
-      p.y =  stof(splitLine[2]);
-      points.push_back(p);
-    }
-  }
-  return triangles;
-}
-
-//GET INDEXES FOR TEXTURING
-vector<vec3> readTextureIndex(string filename){
-  vector<TexturePoint> texturepoints = readTexturePoints(filename);
-  fstream myfile;
-  myfile.open(filename);
-  std::string line;
-  vector<vec3> textureTriangles;
-  vector<vec3> readvertices = readVertices(SCALETING, filename);
-  while (getline(myfile, line)) {
-    string *splitLine = split(line, ' ');
-    if(splitLine[0] == "f"){
-      int slashpos1 =  splitLine[1].find('/');
-      int slashpos2 =  splitLine[2].find('/');
-      int slashpos3 =  splitLine[3].find('/');
-      string Tpoint1 = splitLine[1].substr(slashpos1,splitLine[1].length());
-      string Tpoint2 = splitLine[1].substr(slashpos1,splitLine[2].length());
-      string Tpoint3 = splitLine[1].substr(slashpos1,splitLine[3].length());
-      float Tp1 = stof(Tpoint1) - 1;
-      float Tp2 = stof(Tpoint2) - 1;
-      float Tp3 = stof(Tpoint3) - 1;
-      textureTriangles.push_back(vec3(texturepoints[Tp1],texturepoints[Tp2],texturepoints[Tp3]));
-    }
-  }
-}
-
-
-//GET IMG DATA
-vector<uint32_t> loadImg(string filename){
-  string line1;
-  string line2;
-  string line3;
-  ifstream myfile;
-  myfile.open(filename);
-  getline(myfile, line1);
-  getline(myfile, line2);
-  getline(myfile, line3);
-  string width = line3.substr(0,3);
-  string height = line3.substr(4,3);
-  int w = stoi(width);
-  int h = stoi(height);
-  vector<uint32_t> pixeldata;
-  for(int i =0;i<w;i++){
-    for(int j =0;j<h;j++){
-      int r,g,b;
-      r = myfile.get();
-      g = myfile.get();
-      b = myfile.get();
-      uint32_t colour = (255<<24) + (r<<16) + (g<<8) + b;
-      // window.setPixelColour(i, j, colour);
-      pixeldata.push_back(colour);
-    }
-  }
-  return pixeldata;
-}
 vector<CanvasTriangle> modelToCanvas(vec3 camera, vector<ModelTriangle> triangles, float focalDistance, float canvasScale){
 
   vector<CanvasTriangle> canvastriangles;
-  vector<vec3> triangletextures = readTextureIndex("logo.obj");
+  // vector<vec3> triangletextures = readTextureIndex("logo.obj");
   // vector<TexturePoint> texturePoints = readTexturePoints("logo.obj");
 
   for(u_int i=0;i<triangles.size();i++){
 
-    TexturePoint p1 = triangletextures[i].x;
-    TexturePoint p2 = triangletextures[i].y;
-    TexturePoint p3 = triangletextures[i].z;
+    // int p1 = triangletextures[i].x;
+    // int p2 = triangletextures[i].y;
+    // int p3 = triangletextures[i].z;
 
     CanvasPoint test1,test2,test3;
     CanvasPoint projP1,projP2,projP3;
@@ -195,7 +139,7 @@ vector<CanvasTriangle> modelToCanvas(vec3 camera, vector<ModelTriangle> triangle
     projP1.x = P1XProj;
     projP1.y = P1YProj;
     projP1.depth = 1/-(adjustedPos1.z);
-    projP1.texturePoint = p1;
+    // projP1.texturePoint = texturePoints[p1];
 
 
     cameraP2x = test2.x - camera.x;
@@ -211,7 +155,7 @@ vector<CanvasTriangle> modelToCanvas(vec3 camera, vector<ModelTriangle> triangle
     projP2.x = P2XProj;
     projP2.y = P2YProj;
     projP2.depth = 1/-(adjustedPos2.z);
-    projP2.texturePoint = p2;
+    // projP2.texturePoint = texturePoints[p2];
 
 
     cameraP3x = test3.x - camera.x;
@@ -227,7 +171,7 @@ vector<CanvasTriangle> modelToCanvas(vec3 camera, vector<ModelTriangle> triangle
     projP3.x = P3XProj;
     projP3.y = P3YProj;
     projP3.depth = 1/-(adjustedPos3.z);
-    projP3.texturePoint = p3;
+    // projP3.texturePoint = texturePoints[p3];
 
 
     canvastriangles.push_back(CanvasTriangle(projP1,projP2,projP3));
@@ -301,11 +245,27 @@ void draw3DRasterisedTriangles(vector<CanvasTriangle> canvastriangles) {
         if((current.x >= 0) && ((int)current.x < WIDTH) && ((int)current.y >= 0) && ((int)current.y < HEIGHT)) {
           if(current.depth > buffer[(int)current.x][(int)current.y]) {
             buffer[(int)current.x][(int)current.y] = current.depth;
-            window.setPixelColour((int)current.texturePoint, (int)current.y, colour);
+            window.setPixelColour((int)current.x, (int)current.y, colour);
           }
         }
       }
     }
 
+  }
+}
+
+int main(int argc, char* argv[])
+{
+  SDL_Event event;
+  vector<ModelTriangle> triangles = readtriangles("logo.obj");
+  vector<CanvasTriangle> canvas = modelToCanvas(camera, triangles, 5, 100);
+  draw3DRasterisedTriangles(canvas);
+  while(true)
+  {
+    if(window.pollForInputEvents(&event)){
+      // handleEvent(event);
+      window.clearPixels();
+    }
+    window.renderFrame();
   }
 }
