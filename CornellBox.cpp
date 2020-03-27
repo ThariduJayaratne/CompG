@@ -512,6 +512,77 @@ RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDire
   }
   return intersectionP;
 }
+vec3 normaltoVertices(ModelTriangle trianglex){
+  vec3 normaltOvertices = normalize(cross(trianglex.vertices[1]-trianglex.vertices[0],trianglex.vertices[2]-trianglex.vertices[0]));
+  return normaltOvertices;
+}
+
+float compBrightness( RayTriangleIntersection intersectP, vec3 normaltovertices){
+  vec3 pToL = whitelight - intersectP.intersectionPoint;
+  float dotProd = normalize(dot(normaltovertices,pToL));
+  if(dotProd < 0.0f) dotProd = 0.0f;
+  float myDistance = length(pToL);
+  float brightness = 5 * (dotProd)/(0.5*M_PI* myDistance * myDistance);
+  if(brightness > 1.0f) brightness = 1.0f;
+  if(brightness < 0.2f) brightness = 0.2f;
+  return brightness;
+}
+
+void antialiasing(vector<ModelTriangle> triangles){
+  for(int x=0;x<WIDTH;x++){
+    for(int y=0;y<HEIGHT;y++){
+      vec3 dir = rayDir(x,y);
+      RayTriangleIntersection intersectP = getClosestIntersection(camera, dir, triangles);
+      vec3 dir1 = rayDir(x + 0.5 ,y + 0.5);
+      RayTriangleIntersection intersectP1 = getClosestIntersection(camera, dir1, triangles);
+      vec3 dir2 = rayDir(x + 0.5 ,y - 0.5);
+      RayTriangleIntersection intersectP2 = getClosestIntersection(camera, dir2, triangles);
+      vec3 dir3 = rayDir(x - 0.5 ,y + 0.5);
+      RayTriangleIntersection intersectP3 = getClosestIntersection(camera, dir3, triangles);
+      vec3 dir4 = rayDir(x - 0.5 ,y - 0.5);
+      RayTriangleIntersection intersectP4 = getClosestIntersection(camera, dir4, triangles);
+
+      ModelTriangle trianglex = intersectP.intersectedTriangle;
+      ModelTriangle triangle1 = intersectP1.intersectedTriangle;
+      ModelTriangle triangle2 = intersectP2.intersectedTriangle;
+      ModelTriangle triangle3 = intersectP3.intersectedTriangle;
+      ModelTriangle triangle4 = intersectP4.intersectedTriangle;
+
+      Colour c = intersectP.intersectedTriangle.colour;
+      Colour c1 = intersectP1.intersectedTriangle.colour;
+      Colour c2 = intersectP2.intersectedTriangle.colour;
+      Colour c3 = intersectP3.intersectedTriangle.colour;
+      Colour c4 = intersectP4.intersectedTriangle.colour;
+
+      float avgred = (c.red + c1.red + c2.red + c3.red + c4.red)/5;
+      float avggreen = (c.green + c1.green + c2.green + c3.green + c4.green)/5;
+      float avgblue = (c.blue + c1.blue + c2.blue + c3.blue + c4.blue)/5;
+
+
+      vec3 normaltoVerticesx = normaltoVertices(trianglex);
+      vec3 normaltoVertices1 = normaltoVertices(triangle1);
+      vec3 normaltoVertices2 = normaltoVertices(triangle2);
+      vec3 normaltoVertices3 = normaltoVertices(triangle3);
+      vec3 normaltoVertices4 = normaltoVertices(triangle4);
+
+      float brightnessx = compBrightness(intersectP, normaltoVerticesx);
+      float brightness1 = compBrightness(intersectP1, normaltoVertices1);
+      float brightness2 = compBrightness(intersectP2, normaltoVertices2);
+      float brightness3 = compBrightness(intersectP3, normaltoVertices3);
+      float brightness4 = compBrightness(intersectP4, normaltoVertices4);
+
+
+      float avgB = (brightnessx + brightness1 + brightness2 + brightness3 + brightness4)/5;
+
+      uint32_t avg = (255<<24) + (int(avgred * avgB)<<16) + (int(avggreen * avgB)<<8) + int(avgblue * avgB);
+
+
+      if(intersectP.distanceFromCamera != INFINITY){
+        window.setPixelColour(x, y, avg);
+      }
+    }
+  }
+}
 
 
 void computeRayT(vector<ModelTriangle> triangles,vec3 whitelight){
@@ -519,9 +590,13 @@ void computeRayT(vector<ModelTriangle> triangles,vec3 whitelight){
     for(int y=0;y<HEIGHT;y++){
       vec3 dir = rayDir(x,y);
       RayTriangleIntersection intersectP = getClosestIntersection(camera, dir, triangles);
+
       ModelTriangle trianglex = intersectP.intersectedTriangle;
+
       vec3 normaltovertices = normalize(cross(trianglex.vertices[1]-trianglex.vertices[0],trianglex.vertices[2]-trianglex.vertices[0]));
+
       Colour c = intersectP.intersectedTriangle.colour;
+
       vec3 pToL = whitelight - intersectP.intersectionPoint;
       float dotProd = normalize(dot(normaltovertices,pToL));
       if(dotProd < 0.0f) dotProd = 0.0f;
@@ -529,6 +604,8 @@ void computeRayT(vector<ModelTriangle> triangles,vec3 whitelight){
       float brightness = 5 * (dotProd)/(0.5*M_PI* myDistance * myDistance);
       if(brightness > 1.0f) brightness = 1.0f;
       if(brightness < 0.2f) brightness = 0.2f;
+
+
       uint32_t colour = (255<<24) + (int(c.red * brightness)<<16) + (int(c.green * brightness)<<8) + int(c.blue * brightness);
       if(intersectP.distanceFromCamera != INFINITY){
         window.setPixelColour(x, y, colour);
@@ -572,6 +649,9 @@ int main(int argc, char* argv[])
 
       else if (mode == 3) {
         computeRayT(triangles, whitelight);
+      }
+      else if (mode == 4) {
+        antialiasing(triangles);
       }
     }
     window.renderFrame();
@@ -664,6 +744,9 @@ void handleEvent(SDL_Event event)
     }
     else if(event.key.keysym.sym == SDLK_3) {
       mode = 3;
+    }
+    else if(event.key.keysym.sym == SDLK_4) {
+      mode = 4;
     }
     else if(event.key.keysym.sym == SDLK_c) {
       window.clearPixels();
