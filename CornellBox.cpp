@@ -77,11 +77,15 @@ vector<CanvasPoint> interpolation2(CanvasPoint from, CanvasPoint to, int n) {
   float stepx = (to.x - from.x)/n;
   float stepy = (to.y - from.y)/n;
   double stepDepth = (to.depth - from.depth)/n;
+  float stepxt = (to.texturePoint.x - from.texturePoint.x)/n;
+  float stepyt = (to.texturePoint.y - from.texturePoint.y)/n;
   for(int i = 0; i <= n; i++) {
     CanvasPoint pt;
     pt.x = from.x + i * stepx;
     pt.y = from.y + i * stepy;
     pt.depth = from.depth + i * stepDepth;
+    pt.texturePoint.x =  from.texturePoint.x + i * stepxt;
+    pt.texturePoint.y =  from.texturePoint.y + i * stepyt;
     list.push_back(pt);
   }
   return list;
@@ -235,7 +239,7 @@ vector<ModelTriangle> readtriangles2(string filename){
   return triangles;
 }
 
-vector<TexturePoint> readTexturePoints(string filename){
+vector<TexturePoint> readTexturePoints(float scale,string filename){
   fstream myfile;
   myfile.open(filename);
   std::string line;
@@ -244,8 +248,8 @@ vector<TexturePoint> readTexturePoints(string filename){
   while (getline(myfile, line)) {
     string *splitLine = split(line, ' ');
     if(splitLine[0] == "vt"){
-      p.x =  stof(splitLine[1]);
-      p.y =  stof(splitLine[2]);
+      p.x =  stof(splitLine[1]) * scale;
+      p.y =  stof(splitLine[2]) * scale;
       points.push_back(p);
     }
   }
@@ -279,28 +283,76 @@ vector<uint32_t> loadImg(string filename){
 }
 
 vector<ModelTexture> readTextureIndex(string filename){
+  vector<ModelTexture> textureTriangles;
   Colour c;
   c.red = 255;
   c.green = 0;
   c.blue = 0;
-  ifstream myfile;
-  myfile.open(filename);
-  std::string line;
-  vector<TexturePoint> textPoints = readTexturePoints(filename);
+  TexturePoint p1;
+  p1.x =  -1;
+  p1.y =  -1;
+  if(filename == "sphere.obj" || filename == "cornell-box.obj"){
+    ifstream myfile;
+    myfile.open(filename);
+    std::string line;
+    vector<TexturePoint> textPoints = readTexturePoints(300.f,filename);
+    while (getline(myfile, line)) {
+      string *splitLine = split(line, ' ');
+      if(splitLine[0] == "f"){
+        ModelTexture toPush = ModelTexture(p1, p1, p1,c);
+        toPush.name = "noTexture";
+        textureTriangles.push_back(toPush);
+      }
+    }
+  }
+  else{
+    ifstream myfile;
+    myfile.open(filename);
+    std::string line;
+    vector<TexturePoint> textPoints = readTexturePoints(300.f,filename);
+    while (getline(myfile, line)) {
+      string *splitLine = split(line, ' ');
+      if(splitLine[0] == "f"){
+        int slashpos1 =  splitLine[1].find('/');
+        int slashpos2 =  splitLine[2].find('/');
+        int slashpos3 =  splitLine[3].find('/');
+        string Tpoint1 = splitLine[1].substr(slashpos1 + 1,splitLine[1].length());
+        string Tpoint2 = splitLine[2].substr(slashpos2 + 1,splitLine[2].length());
+        string Tpoint3 = splitLine[3].substr(slashpos3 + 1,splitLine[3].length());
+        int Tp1 = stoi(Tpoint1) - 1;
+        int Tp2 = stoi(Tpoint2) - 1;
+        int Tp3 = stoi(Tpoint3) - 1;
+        ModelTexture toPush = ModelTexture(textPoints[Tp1], textPoints[Tp2], textPoints[Tp3],c);
+        toPush.name = "logo";
+        textureTriangles.push_back(toPush);
+      }
+    }
+  }
+  return textureTriangles;
+}
+vector<ModelTexture> readTextureIndexForRayTracer(string filename){
+  Colour c;
+  c.red = 255;
+  c.green = 0;
+  c.blue = 0;
   vector<ModelTexture> textureTriangles;
-  while (getline(myfile, line)) {
-    string *splitLine = split(line, ' ');
-    if(splitLine[0] == "f"){
-      int slashpos1 =  splitLine[1].find('/');
-      int slashpos2 =  splitLine[2].find('/');
-      int slashpos3 =  splitLine[3].find('/');
-      string Tpoint1 = splitLine[1].substr(slashpos1 + 1,splitLine[1].length());
-      string Tpoint2 = splitLine[2].substr(slashpos2 + 1,splitLine[2].length());
-      string Tpoint3 = splitLine[3].substr(slashpos3 + 1,splitLine[3].length());
-      int Tp1 = stoi(Tpoint1) - 1;
-      int Tp2 = stoi(Tpoint2) - 1;
-      int Tp3 = stoi(Tpoint3) - 1;
-      textureTriangles.push_back(ModelTexture(textPoints[Tp1], textPoints[Tp2], textPoints[Tp3],c));
+    ifstream myfile;
+    myfile.open(filename);
+    std::string line;
+    vector<TexturePoint> textPoints = readTexturePoints(1.0f,filename);
+    while (getline(myfile, line)) {
+      string *splitLine = split(line, ' ');
+      if(splitLine[0] == "f"){
+        int slashpos1 =  splitLine[1].find('/');
+        int slashpos2 =  splitLine[2].find('/');
+        int slashpos3 =  splitLine[3].find('/');
+        string Tpoint1 = splitLine[1].substr(slashpos1 + 1,splitLine[1].length());
+        string Tpoint2 = splitLine[2].substr(slashpos2 + 1,splitLine[2].length());
+        string Tpoint3 = splitLine[3].substr(slashpos3 + 1,splitLine[3].length());
+        int Tp1 = stoi(Tpoint1) - 1;
+        int Tp2 = stoi(Tpoint2) - 1;
+        int Tp3 = stoi(Tpoint3) - 1;
+        textureTriangles.push_back(ModelTexture(textPoints[Tp1], textPoints[Tp2], textPoints[Tp3],c));
     }
   }
   return textureTriangles;
@@ -352,6 +404,128 @@ void drawLine(CanvasPoint from, CanvasPoint to, uint32_t colour) {
     float y = from.y + (yStepSize*i);
     window.setPixelColour(round(x), round(y), colour);
   }
+}
+void swap(int* a , int*b)
+{
+    int temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+float absolute(float x )
+{
+    if (x < 0) return -x;
+    else return x;
+}
+
+//returns integer part of a floating point number
+int iPartOfNumber(float x)
+{
+    return (int)x;
+}
+
+//rounds off a number
+int roundNumber(float x)
+{
+    return iPartOfNumber(x + 0.5) ;
+}
+
+//returns fractional part of a number
+float fPartOfNumber(float x)
+{
+    if (x>0) return x - iPartOfNumber(x);
+    else return x - (iPartOfNumber(x)+1);
+
+}
+
+//returns 1 - fractional part of number
+float rfPartOfNumber(float x)
+{
+    return 1 - fPartOfNumber(x);
+}
+
+void drawPixel( int x , int y ,uint32_t colour, float brightness)
+{
+    int r = (colour >> 16) & 255;
+    int g = (colour >> 8) & 255;
+    int b = (colour) & 255;
+    uint32_t newcolour = (255<<24) + (int(r * brightness)<<16) + (int(g * brightness)<<8) + int(b * brightness);
+    if(x<WIDTH && y<HEIGHT && x>=0 && y>=0){
+      window.setPixelColour(x,y,newcolour);
+    }
+}
+
+void drawWuLines(CanvasPoint from, CanvasPoint to, uint32_t colour) {
+  float fromX = from.x;
+  float fromY = from.y;
+  float toX = to.x;
+  float toY = to.y;
+
+  int steep = absolute(toY - fromY) > absolute(toX - fromX);
+
+   if (steep)
+   {
+       swap(fromX, fromY);
+       swap(toX, toY);
+   }
+   if (fromX > toX)
+   {
+       swap( fromX , toX);
+       swap( fromY , toY);
+   }
+   float dx =  toX - fromX;
+   float dy =  toY - fromY;
+   float gradient = dy/dx;
+   if (dx == 0.0)
+       gradient = 1;
+
+   int xend1 = round(fromX);
+   int xend2 = round(toX);
+   float yend1 = fromY + gradient*(xend1  - fromX);
+   float yend2 = toY + gradient*(xend2  - toX);
+
+   int xpxl1 = xend1;
+   int xpxl2 = xend2;
+
+   int ypxl1 = iPartOfNumber(yend1);
+   int ypxl2 = iPartOfNumber(yend2);
+
+   float intersectY = yend1 + gradient;
+
+    if(steep){
+       drawPixel(ypxl1, xpxl1, colour, rfPartOfNumber(yend1) * fPartOfNumber(fromX+0.5));
+       drawPixel(ypxl1+1, xpxl1, colour,fPartOfNumber(yend1) * fPartOfNumber(fromX+0.5));
+       drawPixel(ypxl2, xpxl2, colour, rfPartOfNumber(yend2) * fPartOfNumber(toX+0.5));
+       drawPixel(ypxl2+1, xpxl2, colour,fPartOfNumber(yend2) * fPartOfNumber(toX+0.5));
+   }
+  else{
+    drawPixel(xpxl1,ypxl1,colour, rfPartOfNumber(yend1) * fPartOfNumber(fromX+0.5));
+    drawPixel(xpxl1,ypxl1+1,colour,fPartOfNumber(yend1) * fPartOfNumber(fromX+0.5));
+    drawPixel( xpxl2,ypxl2, colour, rfPartOfNumber(yend2) * fPartOfNumber(toX+0.5));
+    drawPixel(xpxl2,ypxl2+1,  colour,fPartOfNumber(yend2) * fPartOfNumber(toX+0.5));
+  }
+   if (steep)
+   {
+       int x;
+       for (x = xpxl1+1 ; x <xpxl2-1 ; x++)
+       {
+           drawPixel(iPartOfNumber(intersectY), x, colour, rfPartOfNumber(intersectY));
+           drawPixel(iPartOfNumber(intersectY)+1, x,colour, fPartOfNumber(intersectY));
+           intersectY += gradient;
+       }
+   }
+   else
+   {
+       int x;
+       for (x = xpxl1+1 ; x <xpxl2-1 ; x++)
+       {
+           drawPixel(x, iPartOfNumber(intersectY),colour,
+                       rfPartOfNumber(intersectY));
+           drawPixel(x, iPartOfNumber(intersectY)+1,colour,
+                         fPartOfNumber(intersectY));
+           intersectY += gradient;
+       }
+   }
 }
 
 void drawTriangle( CanvasPoint point1, CanvasPoint point2, CanvasPoint point3, uint32_t colour) {
@@ -447,8 +621,7 @@ void draw3DWireframes(vector<CanvasTriangle> triangles) {
 }
 
 
-
-void draw3DRasterisedTriangles(vector<CanvasTriangle> canvastriangles) {
+void draw3DRasterisedTriangles(vector<CanvasTriangle> canvastriangles, vector<uint32_t> colours) {
 
   double **buffer = malloc2dArray(WIDTH, HEIGHT);
   for(u_int y = 0; y < HEIGHT; y++) {
@@ -489,6 +662,10 @@ void draw3DRasterisedTriangles(vector<CanvasTriangle> canvastriangles) {
     double ratio = (point3.y - point2.y)/(point3.y - point1.y);
     double point4Depth = point3.depth - ratio * (point3.depth - point1.depth);
     CanvasPoint point4 = CanvasPoint(point3.x - ratio * (point3.x - point1.x), point3.y - ratio * (point3.y - point1.y), point4Depth);
+
+    point4.texturePoint.x = point3.texturePoint.x - ratio * (point3.texturePoint.x - point1.texturePoint.x);
+    point4.texturePoint.y = point3.texturePoint.y - ratio * (point3.texturePoint.y - point1.texturePoint.y);
+
     vector<CanvasPoint> points1to4coord = interpolation2(point1,point4,(point2.y-point1.y)+1);
     vector<CanvasPoint> points1to2coord = interpolation2(point1,point2,(point2.y-point1.y)+1);
     vector<CanvasPoint> points4to3coord = interpolation2(point4,point3,(point3.y-point2.y)+1);
@@ -501,7 +678,12 @@ void draw3DRasterisedTriangles(vector<CanvasTriangle> canvastriangles) {
         if(((int)current.x >= 0) && ((int)current.x < WIDTH) && ((int)current.y >= 0) && ((int)current.y < HEIGHT)) {
           if(current.depth > buffer[(int)current.x][(int)current.y]) {
             buffer[(int)current.x][(int)current.y] = current.depth;
-            window.setPixelColour((int)current.x, (int)current.y, colour);
+            if(current.texturePoint.x == -1 && current.texturePoint.y == -1 ){
+              window.setPixelColour((int)current.x, (int)current.y, colour);
+            }
+            else{
+              window.setPixelColour((int)current.x, (int)current.y, colours[round(current.texturePoint.x) + round(current.texturePoint.y) * 300 ]);
+            }
           }
         }
       }
@@ -514,7 +696,12 @@ void draw3DRasterisedTriangles(vector<CanvasTriangle> canvastriangles) {
         if((current.x >= 0) && ((int)current.x < WIDTH) && ((int)current.y >= 0) && ((int)current.y < HEIGHT)) {
           if(current.depth > buffer[(int)current.x][(int)current.y]) {
             buffer[(int)current.x][(int)current.y] = current.depth;
-            window.setPixelColour((int)current.x, (int)current.y, colour);
+            if(current.texturePoint.x == -1 && current.texturePoint.y == -1 ){
+              window.setPixelColour((int)current.x, (int)current.y, colour);
+            }
+            else{
+              window.setPixelColour((int)current.x, (int)current.y, colours[round(current.texturePoint.x) + round(current.texturePoint.y) * 300 ]);
+            }
           }
         }
       }
@@ -522,8 +709,67 @@ void draw3DRasterisedTriangles(vector<CanvasTriangle> canvastriangles) {
 
   }
 }
+void drawTextureTriangles(vector<CanvasTriangle> canvastriangles) {
+   vector<uint32_t> colours = loadImg("texture1.ppm");
+   for(u_int i = 0; i < canvastriangles.size(); i++){
 
-vector<CanvasTriangle> modelToCanvas(vec3 camera, vector<ModelTriangle> triangles, float focalDistance, float canvasScale){
+     CanvasPoint point1 = canvastriangles[i].vertices[0];
+     CanvasPoint point2 = canvastriangles[i].vertices[1];
+     CanvasPoint point3 = canvastriangles[i].vertices[2];
+
+     for (int i = 0; i < 2; i++) {
+       if (point3.y < point2.y) {
+         CanvasPoint temp = point2;
+         point2 = point3;
+         point3 = temp;
+       }
+       if (point2.y < point1.y) {
+         CanvasPoint temp = point1;
+         point1 = point2;
+         point2 = temp;
+       }
+       if (point3.y < point1.y) {
+         CanvasPoint temp = point1;
+         point1 = point3;
+         point3 = temp;
+       }
+     }
+
+     double ratio = (point3.y - point2.y)/(point3.y - point1.y);
+     double point4Depth = point3.depth - ratio * (point3.depth - point1.depth);
+     CanvasPoint point4 = CanvasPoint(point3.x - ratio * (point3.x - point1.x), point3.y - ratio * (point3.y - point1.y), point4Depth);
+
+     point4.texturePoint.x = point3.texturePoint.x - ratio * (point3.texturePoint.x - point1.texturePoint.x);
+     point4.texturePoint.y = point3.texturePoint.y - ratio * (point3.texturePoint.y - point1.texturePoint.y);
+
+     vector<CanvasPoint> points1to4coord = interpolation2(point1,point4,(point2.y-point1.y)+1);
+     vector<CanvasPoint> points1to2coord = interpolation2(point1,point2,(point2.y-point1.y)+1);
+     vector<CanvasPoint> points4to3coord = interpolation2(point4,point3,(point3.y-point2.y)+1);
+     vector<CanvasPoint> points2to3coord = interpolation2(point2,point3,(point3.y-point2.y)+1);
+
+     for (u_int i = 0; i < points1to4coord.size(); i++) {
+       vector<CanvasPoint> pointstofillcoord = interpolation2(points1to4coord[i],points1to2coord[i],abs(points1to4coord[i].x-points1to2coord[i].x)+1);
+       for(u_int k = 0; k < pointstofillcoord.size(); k++) {
+         CanvasPoint current = pointstofillcoord[k];
+         if(((int)current.x >= 0) && ((int)current.x < WIDTH) && ((int)current.y >= 0) && ((int)current.y < HEIGHT)) {
+            window.setPixelColour((int)current.x, (int)current.y, colours[round(current.texturePoint.x) + round(current.texturePoint.y) * 300 ]);
+       }
+     }
+   }
+
+     for (u_int i = 0; i < points4to3coord.size(); i++) {
+       vector<CanvasPoint> pointstofillcoord = interpolation2(points4to3coord[i],points2to3coord[i],abs(points4to3coord[i].x-points2to3coord[i].x)+1);
+       for(u_int k = 0; k < pointstofillcoord.size(); k++) {
+         CanvasPoint current = pointstofillcoord[k];
+         if((int)(current.x >= 0) && ((int)current.x < WIDTH) && ((int)current.y >= 0) && ((int)current.y < HEIGHT)) {
+             window.setPixelColour((int)current.x, (int)current.y, colours[round(current.texturePoint.x) + round(current.texturePoint.y) * 300 ]);
+         }
+       }
+     }
+   }
+}
+
+vector<CanvasTriangle> modelToCanvas(vec3 camera, vector<ModelTriangle> triangles, vector<ModelTexture> textureTriangles, float focalDistance, float canvasScale){
 
   vector<CanvasTriangle> canvastriangles;
 
@@ -545,6 +791,11 @@ vector<CanvasTriangle> modelToCanvas(vec3 camera, vector<ModelTriangle> triangle
     test2.depth = triangles[i].vertices[1].z;
     test3.depth = triangles[i].vertices[2].z;
 
+
+    TexturePoint p1 = textureTriangles[i].vertices[0];
+    TexturePoint p2 = textureTriangles[i].vertices[1];
+    TexturePoint p3 = textureTriangles[i].vertices[2];
+
     //PERSPECTIVE
     cameraP1x = test1.x - camera.x;
     cameraP1y = test1.y - camera.y;
@@ -560,10 +811,13 @@ vector<CanvasTriangle> modelToCanvas(vec3 camera, vector<ModelTriangle> triangle
     projP1.x = P1XProj;
     projP1.y = P1YProj;
     projP1.depth = 1/-(adjustedPos1.z);
+    projP1.texturePoint = p1;
+
 
     cameraP2x = test2.x - camera.x;
     cameraP2y = test2.y - camera.y;
     cameraP2z = test2.depth - camera.z;
+
 
     vec3 camPer2 = vec3(cameraP2x,cameraP2y,cameraP2z);
     vec3 adjustedPos2 = camPer2 * camOrien;
@@ -574,6 +828,8 @@ vector<CanvasTriangle> modelToCanvas(vec3 camera, vector<ModelTriangle> triangle
     projP2.x = P2XProj;
     projP2.y = P2YProj;
     projP2.depth = 1/-(adjustedPos2.z);
+    projP2.texturePoint = p2;
+
 
     cameraP3x = test3.x - camera.x;
     cameraP3y = test3.y - camera.y;
@@ -588,6 +844,8 @@ vector<CanvasTriangle> modelToCanvas(vec3 camera, vector<ModelTriangle> triangle
     projP3.x = P3XProj;
     projP3.y = P3YProj;
     projP3.depth = 1/-(adjustedPos3.z);
+    projP3.texturePoint = p3;
+
 
     canvastriangles.push_back(CanvasTriangle(projP1,projP2,projP3,triangles[i].colour));
   }
@@ -596,7 +854,7 @@ vector<CanvasTriangle> modelToCanvas(vec3 camera, vector<ModelTriangle> triangle
 }
 
 vec3 rayDir(int x, int y) {
-  vec3 dir = normalize(vec3(x-WIDTH/2, -(y-HEIGHT/2),-500)-camera)*camOrien;
+  vec3 dir = normalize(vec3(x-WIDTH/2, -(y-HEIGHT/2),-500)-camera)* glm::inverse(camOrien);
   return dir;
 }
 
@@ -755,6 +1013,22 @@ void antialiasing(vector<ModelTriangle> triangles){
     }
   }
 }
+vector<ModelTriangle> culledTriangles(vector<ModelTriangle> triangles){
+  vector<ModelTriangle> culledTriangles;
+  for (u_int i = 0; i < triangles.size(); i++) {
+    vec3 test1 = triangles[i].vertices[0];
+    vec3 test2 = triangles[i].vertices[1];
+    vec3 test3 = triangles[i].vertices[2];
+    vec3 normaltovertices = normalize(cross(test2-test1,test3-test1));
+    vec3 centroid = vec3((test1.x + test2.x + test3.x)/3,(test1.y + test2.y + test3.y)/3,(test1.z + test2.z + test3.z)/3);
+    vec3 camtoCentroid = normalize(camera - centroid);
+    float dotProd = (dot(normaltovertices,camtoCentroid));
+      if(dotProd >= 0){
+        culledTriangles.push_back(triangles[i]);
+      }
+    }
+    return culledTriangles;
+}
 
 void culling(vector<CanvasTriangle> triangles) {
 
@@ -764,27 +1038,7 @@ void culling(vector<CanvasTriangle> triangles) {
       buffer[x][y] = -INFINITY;
     }
   }
-
   for (u_int i = 0; i < triangles.size(); i++) {
-    CanvasPoint test1,test2,test3;
-    test1.x = triangles[i].vertices[0].x;
-    test2.x = triangles[i].vertices[1].x;
-    test3.x = triangles[i].vertices[2].x;
-    test1.y = triangles[i].vertices[0].y;
-    test2.y = triangles[i].vertices[1].y;
-    test3.y = triangles[i].vertices[2].y;
-    test1.depth = triangles[i].vertices[0].depth;
-    test2.depth = triangles[i].vertices[1].depth;
-    test3.depth = triangles[i].vertices[2].depth;
-    vec3 p0 = vec3(test1.x,test1.y,test1.depth);
-    vec3 p1 = vec3(test2.x,test2.y,test2.depth);
-    vec3 p2 = vec3(test3.x,test3.y,test3.depth);
-    vec3 normaltovertices = normalize(cross(p1-p0,p2-p0));
-    vec3 centroid = vec3((test1.x + test2.x + test3.x)/3,(test1.y + test2.y + test3.y)/3,(test1.depth + test2.depth + test3.depth)/3);
-    vec3 camtoCentroid = camera - centroid;
-    float dotProd = (dot(normaltovertices,camtoCentroid));
-
-
     Colour c = triangles[i].colour;
     uint32_t colour = (255<<24) + (int(c.red)<<16) + (int(c.green)<<8) + int(c.blue);
 
@@ -799,9 +1053,7 @@ void culling(vector<CanvasTriangle> triangles) {
       if ((int)points1to2[i].x >= 0 && (int)points1to2[i].x < WIDTH && (int)points1to2[i].y >= 0 && (int)points1to2[i].y < HEIGHT) {
         if (points1to2[i].depth > buffer[(int)points1to2[i].x][(int)points1to2[i].y]) {
           buffer[(int)points1to2[i].x][(int)points1to2[i].y] = points1to2[i].depth;
-          if(dotProd >= 0){
             window.setPixelColour((int)points1to2[i].x,(int)points1to2[i].y, colour);
-          }
         }
       }
     }
@@ -810,9 +1062,7 @@ void culling(vector<CanvasTriangle> triangles) {
       if ((int)points1to3[i].x >= 0 && (int)points1to3[i].x < WIDTH && (int)points1to3[i].y >= 0 && (int)points1to3[i].y < HEIGHT) {
         if (points1to3[i].depth > buffer[(int)points1to3[i].x][(int)points1to3[i].y]) {
           buffer[(int)points1to3[i].x][(int)points1to3[i].y] = points1to3[i].depth;
-          if(dotProd >= 0){
           window.setPixelColour((int)points1to3[i].x, (int)points1to3[i].y, colour);
-          }
         }
       }
     }
@@ -821,17 +1071,14 @@ void culling(vector<CanvasTriangle> triangles) {
       if ((int)points2to3[i].x >= 0 && (int)points2to3[i].x < WIDTH && (int)points2to3[i].y >= 0 && (int)points2to3[i].y < HEIGHT) {
         if (points2to3[i].depth > buffer[(int)points2to3[i].x][(int)points2to3[i].y]) {
           buffer[(int)points2to3[i].x][(int)points2to3[i].y] = points2to3[i].depth;
-          if(dotProd >= 0){
           window.setPixelColour((int)points2to3[i].x, (int)points2to3[i].y, colour);
-        }
         }
       }
     }
   }
 }
 
-void computeRayT(vector<ModelTriangle> triangles,vector<ModelTexture> textureTriangles,vec3 whitelight){
-  vector<uint32_t> colours = loadImg("texture1.ppm");
+void computeRayT(vector<ModelTriangle> triangles,vector<ModelTexture> textureTriangles,vec3 whitelight,vector<uint32_t> colours, vec3 camera){
   for(int x=0;x<WIDTH;x++){
     for(int y=0;y<HEIGHT;y++){
       vec3 dir = rayDir(x,y);
@@ -955,8 +1202,20 @@ int main(int argc, char* argv[])
   vector<ModelTriangle> triangles2 = readtriangles2("sphere.obj");
   vector<ModelTriangle> triangles3 = readtriangles3("logo.obj");
   vector<ModelTexture> textureTriangles = readTextureIndex("logo.obj");
+  vector<ModelTexture> textureTriangles2 = readTextureIndex("sphere.obj");
+  vector<ModelTexture> textureTriangles3 = readTextureIndex("cornell-box.obj");
+  vector<ModelTexture> textureTrianglesRay = readTextureIndexForRayTracer("logo.obj");
+  vector<uint32_t> coloursTextures = loadImg("texture1.ppm");
 
-  initializeTexturePoints(triangles3,textureTriangles);
+
+  vector<ModelTexture> completeTextures = textureTriangles3;
+  for(u_int i = 0;i<textureTriangles2.size();i++){
+    completeTextures.push_back(textureTriangles2[i]);
+  }
+  for(u_int i = 0;i<textureTriangles.size();i++){
+    completeTextures.push_back(textureTriangles[i]);
+  }
+  initializeTexturePoints(triangles3,textureTrianglesRay);
   initializePair(triangles2);
 
   vector<ModelTriangle> complete = triangles;
@@ -973,9 +1232,9 @@ int main(int argc, char* argv[])
       handleEvent(event);
       window.clearPixels();
       if (mode == 1) {
-        vector<CanvasTriangle> canvastriangles = modelToCanvas(camera, triangles, 5, 100);
-        vector<CanvasTriangle> canvastriangles2 = modelToCanvas(camera, triangles2, 5, 100);
-        vector<CanvasTriangle> canvastriangles3 = modelToCanvas(camera, triangles3, 5, 100);
+        vector<CanvasTriangle> canvastriangles = modelToCanvas(camera, triangles,textureTriangles3, 5, 100);
+        vector<CanvasTriangle> canvastriangles2 = modelToCanvas(camera, triangles2,textureTriangles2, 5, 100);
+        vector<CanvasTriangle> canvastriangles3 = modelToCanvas(camera, triangles3,textureTriangles, 5, 100);
         vector<CanvasTriangle> complete = canvastriangles;
         for(u_int i = 0;i<canvastriangles2.size();i++){
           complete.push_back(canvastriangles2[i]);
@@ -987,9 +1246,9 @@ int main(int argc, char* argv[])
       }
 
       else if (mode == 2) {
-        vector<CanvasTriangle> canvastriangles = modelToCanvas(camera, triangles, 5, 100);
-        vector<CanvasTriangle> canvastriangles2 = modelToCanvas(camera, triangles2, 5, 100);
-        vector<CanvasTriangle> canvastriangles3 = modelToCanvas(camera, triangles3, 5, 100);
+        vector<CanvasTriangle> canvastriangles = modelToCanvas(camera, triangles,textureTriangles3, 5, 100);
+        vector<CanvasTriangle> canvastriangles2 = modelToCanvas(camera, triangles2,textureTriangles2,  5, 100);
+        vector<CanvasTriangle> canvastriangles3 = modelToCanvas(camera, triangles3,textureTriangles, 5, 100);
 
         vector<CanvasTriangle> complete = canvastriangles;
         for(u_int i = 0;i<canvastriangles2.size();i++){
@@ -998,18 +1257,46 @@ int main(int argc, char* argv[])
         for(u_int i = 0;i<canvastriangles3.size();i++){
           complete.push_back(canvastriangles3[i]);
         }
-        draw3DRasterisedTriangles(complete);
+        vector<uint32_t> colours = loadImg("texture1.ppm");
+
+        draw3DRasterisedTriangles(complete,colours);
       }
 
       else if (mode == 3) {
-        computeRayT(complete,textureTriangles,whitelight);
+        computeRayT(complete,textureTrianglesRay,whitelight,coloursTextures,camera);
       }
       else if (mode == 4) {
         antialiasing(triangles);
       }
       else if (mode == 5){
-        vector<CanvasTriangle> sphere = modelToCanvas(camera, triangles2, 5, 100);
-        culling(sphere);
+        vector<ModelTriangle> complete2 = culledTriangles(complete);
+        vector<CanvasTriangle> culledTrianglesx = modelToCanvas(camera, complete2,completeTextures, 5, 100);
+        culling(culledTrianglesx);
+      }
+      else if (mode == 6){
+        vector<CanvasTriangle> canvastriangles = modelToCanvas(camera, triangles,textureTriangles3, 5, 100);
+        vector<CanvasTriangle> canvastriangles2 = modelToCanvas(camera, triangles2,textureTriangles2,  5, 100);
+        vector<CanvasTriangle> canvastriangles3 = modelToCanvas(camera, triangles3,textureTriangles, 5, 100);
+        vector<CanvasTriangle> complete = canvastriangles;
+        for(u_int i = 0;i<canvastriangles2.size();i++){
+          complete.push_back(canvastriangles2[i]);
+        }
+        for(u_int i = 0;i<canvastriangles3.size();i++){
+          complete.push_back(canvastriangles3[i]);
+        }
+        for(u_int i = 0;i<complete.size();i++){
+          CanvasPoint point1 = complete[i].vertices[0];
+          CanvasPoint point2 = complete[i].vertices[1];
+          CanvasPoint point3 = complete[i].vertices[2];
+          Colour c = complete[i].colour;
+          float red = c.red;
+          float green = c.green;
+          float blue = c.blue;
+          uint32_t colour = (255<<24) + (int(red)<<16) + (int(green)<<8) + int(blue);
+          drawWuLines(point1, point2, colour);
+          drawWuLines(point2, point3, colour);
+          drawWuLines(point1, point3, colour);
+        }
       }
     }
     window.renderFrame();
@@ -1066,8 +1353,7 @@ void handleEvent(SDL_Event event)
       camera.z += 0.1;
     }
 
-
-    if(event.key.keysym.sym == SDLK_g){
+    else if(event.key.keysym.sym == SDLK_g){
       whitelight.x -= 0.1;
       cout << "LightLeft" << endl;
 
@@ -1127,6 +1413,10 @@ void handleEvent(SDL_Event event)
       mode = 5;
       cout << "Culling Mode" << endl;
     }
+    else if(event.key.keysym.sym == SDLK_6) {
+      mode = 6;
+      cout << "Wu Lines Mode" << endl;
+    }
     else if(event.key.keysym.sym == SDLK_c) {
       window.clearPixels();
     }
@@ -1135,7 +1425,7 @@ void handleEvent(SDL_Event event)
       cout << "ROTATE-X" << endl;
     }
     else if(event.key.keysym.sym == SDLK_y) {
-      rotateY(angle);
+      rotateY(-angle);
       cout << "ROTATE-Y" << endl;
     }
     else if(event.key.keysym.sym == SDLK_z) {

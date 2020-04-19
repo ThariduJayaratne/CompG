@@ -2,6 +2,7 @@
 // #include "Colour.h"
 #include <string>
 #include <iostream>
+#include <string>
 
 
 class ModelTexture
@@ -9,6 +10,7 @@ class ModelTexture
   public:
     TexturePoint vertices[3];
     Colour colour;
+    std::string name;
 
     ModelTexture()
     {
@@ -20,6 +22,7 @@ class ModelTexture
       vertices[1] = v1;
       vertices[2] = v2;
       colour = trigColour;
+      name = "";
     }
 };
 
