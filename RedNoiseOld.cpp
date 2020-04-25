@@ -49,6 +49,17 @@ vector<CanvasPoint> interpolation2(CanvasPoint from, CanvasPoint to, int n) {
   return list;
 }
 
+vector<vec3> interpolation3(vec3 from, vec3 to, int n) {
+  vector<vec3> list;
+  float stepx = (to.x - from.x)/(n-1);
+  float stepy = (to.y - from.y)/(n-1);
+  float stepz = (to.z - from.z)/(n-1);
+  for(int i = 0; i < n; i++) {
+    list.push_back(vec3(from.x + i * stepx,from.y + i * stepy,from.z + i * stepz));
+  }
+  return list;
+}
+
 void colorscale(){
   window.clearPixels();
   vec3 r = vec3(255,0,0);

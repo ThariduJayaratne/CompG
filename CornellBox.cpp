@@ -29,7 +29,44 @@ mat3 camOrien = mat3();
 vec3 camera = vec3(0,0,6);
 float angle = 0.1f;
 
-vec3 whitelight = vec3(-0.9 , 2.00925, -0.683984) * (float)SCALETING;
+
+vector<vec3> interpolation3(vec3 from, vec3 to, int n) {
+  vector<vec3> list;
+  float stepx = (to.x - from.x)/(n-1);
+  float stepy = (to.y - from.y)/(n-1);
+  float stepz = (to.z - from.z)/(n-1);
+  for(int i = 0; i < n; i++) {
+    list.push_back(vec3(from.x + i * stepx,from.y + i * stepy,from.z + i * stepz));
+  }
+  return list;
+}
+
+vector<vec3> setwhitelights(vec3 from){
+  vector<vec3> list;
+  list.push_back(from);
+  for(u_int i=1;i<7;i++){
+    vec3 temp = from;
+    float count = 0.02 * i;
+    temp.x += count;
+    list.push_back(temp);
+  }
+  for(u_int i=1;i<7;i++){
+    vec3 temp = from;
+    float count = 0.02 * i;
+    temp.x -= count;
+    list.push_back(temp);
+  }
+  return list;
+}
+
+// vec3 corner1 = vec3(-0.884011,5.018497,-3.567968)* (float)SCALETING;
+// vec3 corner2 = vec3(0.415989,5.019334,-2.517968)* (float)SCALETING;
+// vector<vec3> whitelights = interpolation3(corner1,corner2,13);
+
+vec3 whitelight = vec3(-0.15 , 2.00463, -1.24199);
+
+vector<vec3> whitelights = setwhitelights(whitelight);
+
 // vec3 whitelight = vec3(-0.242005 , 2.00925, -0.683984) * (float)SCALETING;
 
 vector<pair<ModelTriangle,vector<vec3>>> triangleNormals;
@@ -201,7 +238,12 @@ vector<ModelTriangle> readtriangles(string filename, vector<Colour> colours){
       float p2 = stof(point2) - 1;
       float p3 = stof(point3) - 1;
       ModelTriangle toPush = ModelTriangle(readvertices[p1], readvertices[p2], readvertices[p3], colour);
-      toPush.name = "cornell";
+      if(toPush.colour.name == "Mirror"){
+        toPush.name = "mirror";
+      }
+      else{
+        toPush.name = "cornell";
+      }
       triangles.push_back(toPush);
     }
   }
@@ -860,13 +902,13 @@ vec3 rayDir(int x, int y) {
 
 bool inShadow(vec3 surfacePoint, vec3 lightSource, vector<ModelTriangle> triangles, int index){
   bool shadow = false;
-  vec3 dir = normalize(lightSource - surfacePoint);
+  vec3 dir = (lightSource - surfacePoint);
   float distance = length(dir);
   for(u_int i=0;i<triangles.size();i++){
     vec3 e0 = triangles[i].vertices[1] - triangles[i].vertices[0];
     vec3 e1 = triangles[i].vertices[2] - triangles[i].vertices[0];
     vec3 SPVector = surfacePoint - (triangles[i].vertices[0]);
-    mat3 DEMatrix(-dir, e0, e1);
+    mat3 DEMatrix(-normalize(dir), e0, e1);
     vec3 possibleSolution = inverse(DEMatrix) * SPVector;
     float t = possibleSolution.x;
     float u = possibleSolution.y;
@@ -881,39 +923,22 @@ bool inShadow(vec3 surfacePoint, vec3 lightSource, vector<ModelTriangle> triangl
   return shadow;
 }
 
-RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDirection, vector<ModelTriangle> triangles) {
-  RayTriangleIntersection intersectionP;
-  intersectionP.distanceFromCamera = INFINITY;
-  for(u_int i = 0; i < triangles.size(); i++){
-    ModelTriangle triX = triangles[i];
-    vec3 e0 = triX.vertices[1] - triX.vertices[0];
-    vec3 e1 = triX.vertices[2] - triX.vertices[0];
-    vec3 SPVector = cameraPosition - (triX.vertices[0]);
-    mat3 DEMatrix(-rayDirection, e0, e1);
-    vec3 possibleSolution = inverse(DEMatrix) * SPVector;
-    float t = possibleSolution.x;
-    float u = possibleSolution.y;
-    float v = possibleSolution.z;
-    if ((u>= 0) & (u<=1) & (v>= 0) & (v<=1) & ((u+v)<=1)){
-      if (t < intersectionP.distanceFromCamera){
-        if((intersectionP.distanceFromCamera - t) > 0.05){
-        intersectionP.distanceFromCamera = t;
-        intersectionP.intersectedTriangle = triangles[i];
-        intersectionP.intersectionPoint = triangles[i].vertices[0] + (u*e0) + (v*e1);
-        }
-      }
-    }
-  }
-  if(intersectionP.distanceFromCamera == INFINITY)
-  {
-    intersectionP.distanceFromCamera = -INFINITY;
-  }
-  return intersectionP;
-}
 vec3 normaltoVertices(ModelTriangle trianglex){
   vec3 normaltOvertices = normalize(cross(trianglex.vertices[1]-trianglex.vertices[0],trianglex.vertices[2]-trianglex.vertices[0]));
   return normaltOvertices;
 }
+
+int getIndex(ModelTriangle triangle,vector<ModelTriangle> triangles){
+  int index = 0;
+  for(u_int i=0;i<triangles.size();i++){
+    if((triangles[i].vertices[0] == triangle.vertices[0]) & (triangles[i].vertices[1] == triangle.vertices[1]) & (triangles[i].vertices[2] == triangle.vertices[2])){
+      index = i;
+      break;
+    }
+  }
+  return index;
+}
+
 
 float compBrightness( vec3 vectorX, vec3 normaltovertices){
   vec3 pToL = whitelight - vectorX;
@@ -925,7 +950,6 @@ float compBrightness( vec3 vectorX, vec3 normaltovertices){
   if(brightness < 0.2f) brightness = 0.2f;
   return brightness;
 }
-
 
 pair<ModelTriangle,vector<vec3>> compare(ModelTriangle triangle){
   pair<ModelTriangle,vector<vec3>> rightOne;
@@ -948,30 +972,180 @@ pair<ModelTriangle,ModelTexture> compareTP(ModelTriangle triangle){
   return rightOne;
 }
 
-int getIndex(ModelTriangle triangle,vector<ModelTriangle> triangles){
-  int index = 0;
+vector<ModelTriangle> removeTriangle(ModelTriangle triangle,vector<ModelTriangle> triangles){
+  vector<ModelTriangle> newSet;
   for(u_int i=0;i<triangles.size();i++){
-    if((triangles[i].vertices[0] == triangle.vertices[0]) & (triangles[i].vertices[1] == triangle.vertices[1]) & (triangles[i].vertices[2] == triangle.vertices[2])){
-      index = i;
-      break;
+    if(!((triangles[i].vertices[0] == triangle.vertices[0]) & (triangles[i].vertices[1] == triangle.vertices[1]) & (triangles[i].vertices[2] == triangle.vertices[2]))){
+      newSet.push_back(triangles[i]);
     }
   }
-  return index;
+  return newSet;
 }
 
-void antialiasing(vector<ModelTriangle> triangles){
+vec3 returnTUandV(vec3 cameraPosition,ModelTriangle triX,vec3 rayDirection){
+  vec3 e0 = triX.vertices[1] - triX.vertices[0];
+  vec3 e1 = triX.vertices[2] - triX.vertices[0];
+  vec3 SPVector = cameraPosition - (triX.vertices[0]);
+  mat3 DEMatrix(-rayDirection, e0, e1);
+  vec3 possibleSolution = inverse(DEMatrix) * SPVector;
+  return possibleSolution;
+}
+RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDirection, vector<ModelTriangle> triangles,vector<ModelTexture> textureTriangles,vector<uint32_t> colours) {
+  RayTriangleIntersection intersectionP;
+  intersectionP.distanceFromCamera = INFINITY;
+  for(u_int i = 0; i < triangles.size(); i++){
+    ModelTriangle triX = triangles[i];
+    vec3 possibleSolution = returnTUandV(cameraPosition,triX,rayDirection);
+    float t = possibleSolution.x;
+    float u = possibleSolution.y;
+    float v = possibleSolution.z;
+    vec3 e0 = triX.vertices[1] - triX.vertices[0];
+    vec3 e1 = triX.vertices[2] - triX.vertices[0];
+    if ((u>= 0) & (u<=1) & (v>= 0) & (v<=1) & ((u+v)<=1)){
+      if (t < intersectionP.distanceFromCamera){
+        if((intersectionP.distanceFromCamera - t) > 0.05){
+        intersectionP.distanceFromCamera = t;
+        intersectionP.intersectedTriangle = triangles[i];
+        intersectionP.intersectionPoint = triangles[i].vertices[0] + (u*e0) + (v*e1);
+        }
+      }
+    }
+  }
+  if(intersectionP.distanceFromCamera == INFINITY)
+  {
+    intersectionP.distanceFromCamera = -INFINITY;
+  }
+  vec3 solution = returnTUandV(cameraPosition,intersectionP.intersectedTriangle,rayDirection);
+  float u = solution.y;
+  float v = solution.z;
+  vec3 normaltovertices = normalize(cross(intersectionP.intersectedTriangle.vertices[1]-intersectionP.intersectedTriangle.vertices[0],intersectionP.intersectedTriangle.vertices[2]-intersectionP.intersectedTriangle.vertices[0]));
+
+  if(intersectionP.distanceFromCamera != -INFINITY){
+    if(intersectionP.intersectedTriangle.name == "cornell"){
+      int ind = getIndex(intersectionP.intersectedTriangle,triangles);
+      float brightness = compBrightness(intersectionP.intersectionPoint, normaltovertices);
+      if(brightness < 0.2f) brightness = 0.2f;
+      float count = 0;
+      for(u_int i = 0;i<whitelights.size();i++){
+        if(inShadow(intersectionP.intersectionPoint, whitelights[i],triangles,ind)){
+          count++;
+        }
+      }
+      float ratio = count/13;
+      brightness *= 1 - ratio;
+      if(brightness<0.15f){
+        brightness = 0.15f;
+      }
+      if(brightness > 1.0f) brightness = 1.0f;
+      Colour c = intersectionP.intersectedTriangle.colour;
+      c.red = c.red * brightness;
+      c.green = c.green * brightness;
+      c.blue = c.blue * brightness;
+      intersectionP.intersectedTriangle.colour = c;
+    }
+    else if(intersectionP.intersectedTriangle.name == "sphere"){
+      int ind = getIndex(intersectionP.intersectedTriangle,triangles);
+      pair<ModelTriangle,vector<vec3>> rightOne = compare(intersectionP.intersectedTriangle);
+      vector<vec3> normals = rightOne.second;
+      // GOUROUD
+      // float brightness1 = compBrightness(trianglex.vertices[0],normals[0]);
+      // float brightness2 = compBrightness(trianglex.vertices[1],normals[1]);
+      // float brightness3 = compBrightness(trianglex.vertices[2],normals[2]);
+      // float brightness = brightness1 + (u*(brightness2-brightness1)) + (v*(brightness3-brightness1));
+      //PHONG
+      vec3 newNormal = normals[0] + (u*(normals[1]-normals[0])) + (v*(normals[2]-normals[0]));
+      float brightness = compBrightness(intersectionP.intersectionPoint,newNormal);
+      if(brightness < 0.2f) brightness = 0.2f;
+      float count = 0;
+      for(u_int i = 0;i<whitelights.size();i++){
+        if(inShadow(intersectionP.intersectionPoint, whitelights[i],triangles,ind)){
+          count++;
+        }
+      }
+      float ratio = count/13;
+      brightness *= 1 - ratio;
+      if(brightness<0.15f){
+        brightness = 0.15f;
+      }
+      if(brightness > 1.0f) brightness = 1.0f;
+      Colour c = intersectionP.intersectedTriangle.colour;
+      c.red = c.red * brightness;
+      c.green = c.green * brightness;
+      c.blue = c.blue * brightness;
+      intersectionP.intersectedTriangle.colour = c;
+    }
+    else if(intersectionP.intersectedTriangle.name == "hackspace"){
+      int ind = getIndex(intersectionP.intersectedTriangle,triangles);
+      pair<ModelTriangle,ModelTexture> rightTextureP = compareTP(intersectionP.intersectedTriangle);
+      ModelTexture textureTriangle = rightTextureP.second;
+      TexturePoint p1 = textureTriangle.vertices[0];
+      TexturePoint p2 = textureTriangle.vertices[1];
+      TexturePoint p3 = textureTriangle.vertices[2];
+
+      vec2 tp1 = vec2(p1.x,p1.y) * 300.0f;
+      vec2 tp2 = vec2(p2.x,p2.y) * 300.0f;
+      vec2 tp3 = vec2(p3.x,p3.y) * 300.0f;
+      vec2 texPoint = tp1 + (u*(tp2-tp1)) + (v*(tp3-tp1));
+      uint32_t tempC = colours[round(texPoint.x) + round(texPoint.y) * 300 ];
+      int red = (tempC >> 16) & 255;
+      int green = (tempC >> 8) & 255;
+      int blue = (tempC) & 255;
+      float brightness = compBrightness(intersectionP.intersectionPoint, normaltovertices);
+      if(brightness < 0.2f) brightness = 0.2f;
+      float count = 0;
+      for(u_int i = 0;i<whitelights.size();i++){
+        if(inShadow(intersectionP.intersectionPoint, whitelights[i],triangles,ind)){
+          count++;
+        }
+      }
+      float ratio = count/13;
+      brightness *= 1 - ratio;
+      if(brightness<0.15f){
+        brightness = 0.15f;
+      }
+      if(brightness > 1.0f) brightness = 1.0f;
+      Colour c = intersectionP.intersectedTriangle.colour;
+      c.red = red * brightness;
+      c.green = green * brightness;
+      c.blue = blue * brightness;
+      intersectionP.intersectedTriangle.colour = c;
+    }
+     if(intersectionP.intersectedTriangle.name == "mirror"){
+      vec3 reflectionNormal = normaltoVertices(intersectionP.intersectedTriangle);
+      vec3 reflectionRay = rayDirection - (2.0f * reflectionNormal * (dot(rayDirection,reflectionNormal)));
+      vector<ModelTriangle> newSet = removeTriangle(intersectionP.intersectedTriangle,triangles);
+      RayTriangleIntersection intersectR = getClosestIntersection(intersectionP.intersectionPoint,reflectionRay,newSet,textureTriangles,colours);
+      if(intersectR.distanceFromCamera == -INFINITY){
+        Colour c = intersectionP.intersectedTriangle.colour;
+        c.red = 0;
+        c.green = 0;
+        c.blue = 0;
+        intersectionP.intersectedTriangle.colour = c;
+      }
+      else{
+        Colour reflectedColour = intersectR.intersectedTriangle.colour;
+        intersectionP.intersectedTriangle.colour = reflectedColour;
+      }
+    }
+  }
+
+  return intersectionP;
+}
+
+
+void antialiasing(vector<ModelTriangle> triangles,vector<ModelTexture> textureTriangles,vector<uint32_t> colours){
   for(int x=0;x<WIDTH;x++){
     for(int y=0;y<HEIGHT;y++){
       vec3 dir = rayDir(x,y);
-      RayTriangleIntersection intersectP = getClosestIntersection(camera, dir, triangles);
+      RayTriangleIntersection intersectP = getClosestIntersection(camera, dir, triangles,textureTriangles,colours);
       vec3 dir1 = rayDir(x + 0.5 ,y + 0.5);
-      RayTriangleIntersection intersectP1 = getClosestIntersection(camera, dir1, triangles);
+      RayTriangleIntersection intersectP1 = getClosestIntersection(camera, dir1, triangles,textureTriangles,colours);
       vec3 dir2 = rayDir(x + 0.5 ,y - 0.5);
-      RayTriangleIntersection intersectP2 = getClosestIntersection(camera, dir2, triangles);
+      RayTriangleIntersection intersectP2 = getClosestIntersection(camera, dir2, triangles,textureTriangles,colours);
       vec3 dir3 = rayDir(x - 0.5 ,y + 0.5);
-      RayTriangleIntersection intersectP3 = getClosestIntersection(camera, dir3, triangles);
+      RayTriangleIntersection intersectP3 = getClosestIntersection(camera, dir3, triangles,textureTriangles,colours);
       vec3 dir4 = rayDir(x - 0.5 ,y - 0.5);
-      RayTriangleIntersection intersectP4 = getClosestIntersection(camera, dir4, triangles);
+      RayTriangleIntersection intersectP4 = getClosestIntersection(camera, dir4, triangles,textureTriangles,colours);
 
       ModelTriangle trianglex = intersectP.intersectedTriangle;
       ModelTriangle triangle1 = intersectP1.intersectedTriangle;
@@ -1078,84 +1252,21 @@ void culling(vector<CanvasTriangle> triangles) {
   }
 }
 
-void computeRayT(vector<ModelTriangle> triangles,vector<ModelTexture> textureTriangles,vec3 whitelight,vector<uint32_t> colours, vec3 camera){
+void computeRayT(vector<ModelTriangle> triangles,vector<ModelTexture> textureTriangles,vector<vec3> whitelights,vector<uint32_t> colours, vec3 camera){
   for(int x=0;x<WIDTH;x++){
     for(int y=0;y<HEIGHT;y++){
       vec3 dir = rayDir(x,y);
-      RayTriangleIntersection intersectP = getClosestIntersection(camera, dir, triangles);
-
+      RayTriangleIntersection intersectP = getClosestIntersection(camera, dir, triangles,textureTriangles,colours);
       ModelTriangle trianglex = intersectP.intersectedTriangle;
-      pair<ModelTriangle,vector<vec3>> rightOne = compare(trianglex);
-      vector<vec3> normals = rightOne.second;
-
-      vec3 e0 = trianglex.vertices[1] - trianglex.vertices[0];
-      vec3 e1 = trianglex.vertices[2] - trianglex.vertices[0];
-      vec3 SPVector = camera - (trianglex.vertices[0]);
-      mat3 DEMatrix(-dir, e0, e1);
-      vec3 possibleSolution = inverse(DEMatrix) * SPVector;
-      float u = possibleSolution.y;
-      float v = possibleSolution.z;
-
       Colour c = trianglex.colour;
-      vec3 normaltovertices = normalize(cross(trianglex.vertices[1]-trianglex.vertices[0],trianglex.vertices[2]-trianglex.vertices[0]));
       uint32_t colour = (255<<24) + (int(c.red )<<16) + (int(c.green)<<8) + int(c.blue);
         if(intersectP.distanceFromCamera != -INFINITY){
-          if(intersectP.intersectedTriangle.name == "cornell"){
-            int i = getIndex(trianglex,triangles);
-            float brightness = compBrightness(intersectP.intersectionPoint, normaltovertices);
-            if(brightness > 1.0f) brightness = 1.0f;
-            if(brightness < 0.2f) brightness = 0.2f;
-            if(inShadow(intersectP.intersectionPoint, whitelight,triangles,i)){
-              brightness = 0.15f;
-            }
-            colour = (255<<24) + (int(c.red * brightness)<<16) + (int(c.green * brightness)<<8) + int(c.blue * brightness);
-          }
-          else if(intersectP.intersectedTriangle.name == "sphere"){
-            int i = getIndex(trianglex,triangles);
-            // GOUROUD
-            // float brightness1 = compBrightness(trianglex.vertices[0],normals[0]);
-            // float brightness2 = compBrightness(trianglex.vertices[1],normals[1]);
-            // float brightness3 = compBrightness(trianglex.vertices[2],normals[2]);
-            // float brightness = brightness1 + (u*(brightness2-brightness1)) + (v*(brightness3-brightness1));
-            //PHONG
-            vec3 newNormal = normals[0] + (u*(normals[1]-normals[0])) + (v*(normals[2]-normals[0]));
-            float brightness = compBrightness(intersectP.intersectionPoint,newNormal);
-            if(brightness > 1.0f) brightness = 1.0f;
-            if(brightness < 0.2f) brightness = 0.2f;
-            if(inShadow(intersectP.intersectionPoint, whitelight,triangles,i)){
-              brightness = 0.15f;
-            }
-           colour = (255<<24) + (int(c.red * brightness)<<16) + (int(c.green * brightness)<<8) + int(c.blue * brightness);
-          }
-          else if(intersectP.intersectedTriangle.name == "hackspace"){
-            int i = getIndex(trianglex,triangles);
-            pair<ModelTriangle,ModelTexture> rightTextureP = compareTP(trianglex);
-            ModelTexture textureTriangle = rightTextureP.second;
-            TexturePoint p1 = textureTriangle.vertices[0];
-            TexturePoint p2 = textureTriangle.vertices[1];
-            TexturePoint p3 = textureTriangle.vertices[2];
-
-            vec2 tp1 = vec2(p1.x,p1.y) * 300.0f;
-            vec2 tp2 = vec2(p2.x,p2.y) * 300.0f;
-            vec2 tp3 = vec2(p3.x,p3.y) * 300.0f;
-            vec2 texPoint = tp1 + (u*(tp2-tp1)) + (v*(tp3-tp1));
-            uint32_t tempC = colours[round(texPoint.x) + round(texPoint.y) * 300 ];
-            int red = (tempC >> 16) & 255;
-            int green = (tempC >> 8) & 255;
-            int blue = (tempC) & 255;
-            float brightness = compBrightness(intersectP.intersectionPoint, normaltovertices);
-            if(brightness > 1.0f) brightness = 1.0f;
-            if(brightness < 0.2f) brightness = 0.2f;
-            if(inShadow(intersectP.intersectionPoint, whitelight,triangles,i)){
-              brightness = 0.15f;
-            }
-            colour = (255<<24) + (int(red * brightness)<<16) + (int(green * brightness)<<8) + int(blue * brightness);
-          }
           window.setPixelColour(x, y, colour);
         }
     }
   }
 }
+
 
 void initializePair(vector<ModelTriangle> triangles){
   for(u_int i = 0;i<triangles.size();i++){
@@ -1263,10 +1374,10 @@ int main(int argc, char* argv[])
       }
 
       else if (mode == 3) {
-        computeRayT(complete,textureTrianglesRay,whitelight,coloursTextures,camera);
+        computeRayT(complete,textureTrianglesRay,whitelights,coloursTextures,camera);
       }
       else if (mode == 4) {
-        antialiasing(triangles);
+        antialiasing(triangles,textureTrianglesRay,coloursTextures);
       }
       else if (mode == 5){
         vector<ModelTriangle> complete2 = culledTriangles(complete);
@@ -1384,9 +1495,9 @@ void handleEvent(SDL_Event event)
 
     }
     else if(event.key.keysym.sym == SDLK_p){
-      cout << whitelight.x << ' ';
-      cout << whitelight.y << ' ';
-      cout << whitelight.z << ' ';
+      cout << whitelight.x << endl;
+      cout << whitelight.y << endl;
+      cout << whitelight.z << endl;
     }
     else if(event.key.keysym.sym == SDLK_v){
       cout << "SaveImage" << endl;
