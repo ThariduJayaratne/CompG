@@ -20,14 +20,14 @@ using namespace glm;
 #define SCALETING2 0.1
 #define SCALETING3 0.002
 
-
 void handleEvent(SDL_Event event);
 
 DrawingWindow window = DrawingWindow(WIDTH, HEIGHT, false);
-int mode = 1; //1 -> Wireframe    2 -> Rasteriser    3 -> Raytracer   4-> Anitaliasing   5->Culling
+int mode = 1; //1 -> Wireframe    2 -> Rasteriser    3 -> Raytracer   4-> Anitaliasing   5->Culling    6->Wu Lines   7->Jump Animation
 mat3 camOrien = mat3();
 vec3 camera = vec3(0,0,6);
 float angle = 0.1f;
+int fileCount = 0;
 
 
 vector<vec3> interpolation3(vec3 from, vec3 to, int n) {
@@ -59,23 +59,17 @@ vector<vec3> setwhitelights(vec3 from){
   return list;
 }
 
-// vec3 corner1 = vec3(-0.884011,5.018497,-3.567968)* (float)SCALETING;
-// vec3 corner2 = vec3(0.415989,5.019334,-2.517968)* (float)SCALETING;
-// vector<vec3> whitelights = interpolation3(corner1,corner2,13);
-
-vec3 whitelight = vec3(-0.15 , 2.00463, -1.24199);
+// vec3 whitelight = vec3(-0.15 , 2.00463, -1.24199);
+vec3 whitelight = vec3(-0.15,1.80463,-1.04199);
 
 vector<vec3> whitelights = setwhitelights(whitelight);
-
-// vec3 whitelight = vec3(-0.242005 , 2.00925, -0.683984) * (float)SCALETING;
 
 vector<pair<ModelTriangle,vector<vec3>>> triangleNormals;
 vector<pair<ModelTriangle,ModelTexture>> texturePoints;
 
-
-
 void savePPM(){
-  std::ofstream file("frame.ppm", std::ofstream::out | std::ofstream::trunc);
+  string filepath = std::to_string(fileCount) + ".ppm";
+  std::ofstream file(filepath, std::ofstream::out | std::ofstream::trunc);
   file << "P6\n";
   file << "640 480\n";
   file << "255\n";
@@ -169,7 +163,7 @@ vector<vec3> readVertices(float scale, string filename){
   vector<vec3> vertices;
   while (getline(myfile, line)) {
     std::string* lineX = split(line,' ');
-    if(line[0] == 'v'){
+    if(lineX[0] == "v"){
       float xc = stof(lineX[1])*scale;
       float yc = stof(lineX[2])*scale;
       float zc = stof(lineX[3])*scale;
@@ -188,8 +182,8 @@ vector<vec3> readVertices2(float scale, string filename){
     std::string* lineX = split(line,' ');
     if(line[0] == 'v'){
       float xc = stof(lineX[1])*scale - 0.5;
-      float yc = stof(lineX[2])*scale + 0.5;
-      float zc = stof(lineX[3])*scale - 1;
+      float yc = stof(lineX[2])*scale + 0.9;
+      float zc = stof(lineX[3])*scale - 1.3;
       vertices.push_back(vec3(xc,yc,zc));
     }
   }
@@ -205,7 +199,7 @@ vector<vec3> readVertices3(float scale, string filename){
     if(lineX[0] == "v"){
       float xc = stof(lineX[1])*scale - 0.2;
       float yc = stof(lineX[2])*scale + 0.7;
-      float zc = stof(lineX[3])*scale - 0.7;
+      float zc = stof(lineX[3])*scale - 1;
       vertices.push_back(vec3(xc,yc,zc));
     }
   }
@@ -240,6 +234,12 @@ vector<ModelTriangle> readtriangles(string filename, vector<Colour> colours){
       ModelTriangle toPush = ModelTriangle(readvertices[p1], readvertices[p2], readvertices[p3], colour);
       if(toPush.colour.name == "Mirror"){
         toPush.name = "mirror";
+      }
+      else if(toPush.colour.name == "Yellow"){
+        toPush.name = "rightwall";
+      }
+      else if(toPush.colour.name == "Metal"){
+        toPush.name = "metal";
       }
       else{
         toPush.name = "cornell";
@@ -324,6 +324,30 @@ vector<uint32_t> loadImg(string filename){
   return pixeldata;
 }
 
+vector<vec3> loadBumpMap(string filename){
+  string line1;
+  string line2;
+  string line3;
+  ifstream myfile;
+  myfile.open(filename);
+  getline(myfile, line1);
+  getline(myfile, line2);
+  getline(myfile, line3);
+  string width = line2.substr(0,3);
+  string height = line2.substr(4,3);
+  int w = stoi(width);
+  int h = stoi(height);
+  vector<vec3> pixeldata;
+    for(int j =0;j<w*h;j++){
+      float x,y,z;
+      x = (myfile.get());
+      y = (myfile.get());
+      z = (myfile.get());
+      pixeldata.push_back(normalize(vec3(x,y,z)));
+    }
+  return pixeldata;
+}
+
 vector<ModelTexture> readTextureIndex(string filename){
   vector<ModelTexture> textureTriangles;
   Colour c;
@@ -372,6 +396,7 @@ vector<ModelTexture> readTextureIndex(string filename){
   }
   return textureTriangles;
 }
+
 vector<ModelTexture> readTextureIndexForRayTracer(string filename){
   Colour c;
   c.red = 255;
@@ -430,7 +455,52 @@ vector<ModelTriangle> readtriangles3(string filename){
   myfile.close();
   return triangles;
 }
-
+vector<vec3> readVertices4(float scale, string filename){
+  ifstream myfile;
+  myfile.open(filename);
+  std::string line;
+  vector<vec3> vertices;
+  while (getline(myfile, line)) {
+    std::string* lineX = split(line,' ');
+    if(lineX[0] == "v"){
+      float xc = stof(lineX[1])*scale;
+      float yc = stof(lineX[2])*scale;
+      float zc = stof(lineX[3])*scale;
+      vertices.push_back(vec3(xc,yc,zc));
+    }
+  }
+  return vertices;
+}
+vector<ModelTriangle> readtrianglesBump(string filename){
+  Colour c;
+  c.red = 255;
+  c.green = 255;
+  c.blue = 255;
+  ifstream myfile;
+  myfile.open(filename);
+  string line;
+  vector<ModelTriangle> triangles;
+  vector<vec3> readvertices = readVertices4(SCALETING, filename);
+  while(getline(myfile, line)) {
+    string *splitLine = split(line, ' ');
+    if(splitLine[0] == "f"){
+      int slashpos1 =  splitLine[1].find('/');
+      int slashpos2 =  splitLine[2].find('/');
+      int slashpos3 =  splitLine[3].find('/');
+      string point1 = splitLine[1].substr(0,slashpos1);
+      string point2 = splitLine[2].substr(0,slashpos2);
+      string point3 = splitLine[3].substr(0,slashpos3);
+      int p1 = stoi(point1) - 1;
+      int p2 = stoi(point2) - 1;
+      int p3 = stoi(point3) - 1;
+      ModelTriangle toPush = ModelTriangle(readvertices[p1], readvertices[p2], readvertices[p3], c);
+      toPush.name = "rightwall";
+      triangles.push_back(toPush);
+    }
+  }
+  myfile.close();
+  return triangles;
+}
 void drawLine(CanvasPoint from, CanvasPoint to, uint32_t colour) {
 
   float xDiff = to.x - from.x;
@@ -895,6 +965,7 @@ vector<CanvasTriangle> modelToCanvas(vec3 camera, vector<ModelTriangle> triangle
   return canvastriangles;
 }
 
+
 vec3 rayDir(int x, int y) {
   vec3 dir = normalize(vec3(x-WIDTH/2, -(y-HEIGHT/2),-500)-camera)* glm::inverse(camOrien);
   return dir;
@@ -913,7 +984,7 @@ bool inShadow(vec3 surfacePoint, vec3 lightSource, vector<ModelTriangle> triangl
     float t = possibleSolution.x;
     float u = possibleSolution.y;
     float v = possibleSolution.z;
-    if ((u>= 0) & (u<=1) & (v>= 0) & (v<=1) & ((u+v)<=1) & ((int)i != index)){
+    if ((u>= 0) && (u<=1) && (v>= 0) && (v<=1) && ((u+v)<=1) && ((int)i != index)){
       if (t < distance && t > 0.0f){
         shadow = true;
         break;
@@ -931,7 +1002,7 @@ vec3 normaltoVertices(ModelTriangle trianglex){
 int getIndex(ModelTriangle triangle,vector<ModelTriangle> triangles){
   int index = 0;
   for(u_int i=0;i<triangles.size();i++){
-    if((triangles[i].vertices[0] == triangle.vertices[0]) & (triangles[i].vertices[1] == triangle.vertices[1]) & (triangles[i].vertices[2] == triangle.vertices[2])){
+    if((triangles[i].vertices[0] == triangle.vertices[0]) && (triangles[i].vertices[1] == triangle.vertices[1]) && (triangles[i].vertices[2] == triangle.vertices[2])){
       index = i;
       break;
     }
@@ -954,7 +1025,7 @@ float compBrightness( vec3 vectorX, vec3 normaltovertices){
 pair<ModelTriangle,vector<vec3>> compare(ModelTriangle triangle){
   pair<ModelTriangle,vector<vec3>> rightOne;
   for(u_int i=0;i<triangleNormals.size();i++){
-    if((triangleNormals[i].first.vertices[0] == triangle.vertices[0]) & (triangleNormals[i].first.vertices[1] == triangle.vertices[1]) & (triangleNormals[i].first.vertices[2] == triangle.vertices[2])){
+    if((triangleNormals[i].first.vertices[0] == triangle.vertices[0]) && (triangleNormals[i].first.vertices[1] == triangle.vertices[1]) && (triangleNormals[i].first.vertices[2] == triangle.vertices[2])){
       rightOne = triangleNormals[i];
       break;
     }
@@ -964,7 +1035,7 @@ pair<ModelTriangle,vector<vec3>> compare(ModelTriangle triangle){
 pair<ModelTriangle,ModelTexture> compareTP(ModelTriangle triangle){
   pair<ModelTriangle,ModelTexture> rightOne;
   for(u_int i=0;i<texturePoints.size();i++){
-    if((texturePoints[i].first.vertices[0] == triangle.vertices[0]) & (texturePoints[i].first.vertices[1] == triangle.vertices[1]) & (texturePoints[i].first.vertices[2] == triangle.vertices[2])){
+    if((texturePoints[i].first.vertices[0] == triangle.vertices[0]) && (texturePoints[i].first.vertices[1] == triangle.vertices[1]) && (texturePoints[i].first.vertices[2] == triangle.vertices[2])){
       rightOne = texturePoints[i];
       break;
     }
@@ -972,10 +1043,11 @@ pair<ModelTriangle,ModelTexture> compareTP(ModelTriangle triangle){
   return rightOne;
 }
 
+
 vector<ModelTriangle> removeTriangle(ModelTriangle triangle,vector<ModelTriangle> triangles){
   vector<ModelTriangle> newSet;
   for(u_int i=0;i<triangles.size();i++){
-    if(!((triangles[i].vertices[0] == triangle.vertices[0]) & (triangles[i].vertices[1] == triangle.vertices[1]) & (triangles[i].vertices[2] == triangle.vertices[2]))){
+    if(!((triangles[i].vertices[0] == triangle.vertices[0]) && (triangles[i].vertices[1] == triangle.vertices[1]) && (triangles[i].vertices[2] == triangle.vertices[2]))){
       newSet.push_back(triangles[i]);
     }
   }
@@ -990,7 +1062,25 @@ vec3 returnTUandV(vec3 cameraPosition,ModelTriangle triX,vec3 rayDirection){
   vec3 possibleSolution = inverse(DEMatrix) * SPVector;
   return possibleSolution;
 }
-RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDirection, vector<ModelTriangle> triangles,vector<ModelTexture> textureTriangles,vector<uint32_t> colours) {
+
+float RandomFloat(float min, float max)
+{
+    // this  function assumes max > min, you may want
+    // more robust error checking for a non-debug build
+    assert(max > min);
+    float random = ((float) rand()) / (float) RAND_MAX;
+
+    // generate (in your case) a float between 0 and (4.5-.78)
+    // then add .78, giving you a float between .78 and 4.5
+    float range = max - min;
+    return (random*range) + min;
+}
+
+vector<ModelTexture> bumptrianglesray = readTextureIndexForRayTracer("rightwall.obj");
+vector<ModelTriangle> triangles4 = readtrianglesBump("rightwall.obj");
+vector<vec3> surfaceNormals = loadBumpMap("normal.ppm");
+
+RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDirection,vector<ModelTriangle> triangles,vector<ModelTexture> textureTriangles,vector<uint32_t> colours) {
   RayTriangleIntersection intersectionP;
   intersectionP.distanceFromCamera = INFINITY;
   for(u_int i = 0; i < triangles.size(); i++){
@@ -1001,7 +1091,7 @@ RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDire
     float v = possibleSolution.z;
     vec3 e0 = triX.vertices[1] - triX.vertices[0];
     vec3 e1 = triX.vertices[2] - triX.vertices[0];
-    if ((u>= 0) & (u<=1) & (v>= 0) & (v<=1) & ((u+v)<=1)){
+    if ((u>= 0) && (u<=1) && (v>= 0) && (v<=1) && ((u+v)<=1)){
       if (t < intersectionP.distanceFromCamera){
         if((intersectionP.distanceFromCamera - t) > 0.05){
         intersectionP.distanceFromCamera = t;
@@ -1048,12 +1138,15 @@ RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDire
       pair<ModelTriangle,vector<vec3>> rightOne = compare(intersectionP.intersectedTriangle);
       vector<vec3> normals = rightOne.second;
       // GOUROUD
-      // float brightness1 = compBrightness(trianglex.vertices[0],normals[0]);
-      // float brightness2 = compBrightness(trianglex.vertices[1],normals[1]);
-      // float brightness3 = compBrightness(trianglex.vertices[2],normals[2]);
+      // float brightness1 = compBrightness(rightOne.first.vertices[0],normals[0]);
+      // float brightness2 = compBrightness(rightOne.first.[1],normals[1]);
+      // float brightness3 = compBrightness(rightOne.first.[2],normals[2]);
       // float brightness = brightness1 + (u*(brightness2-brightness1)) + (v*(brightness3-brightness1));
       //PHONG
       vec3 newNormal = normals[0] + (u*(normals[1]-normals[0])) + (v*(normals[2]-normals[0]));
+      // vec3 reflectedRay = rayDirection - (2.0f * newNormal * (dot(rayDirection,newNormal)));
+      // float angle = std::max(0.0f,glm::dot(reflectedRay,newNormal));
+      // float specularF = pow(angle,16);
       float brightness = compBrightness(intersectionP.intersectionPoint,newNormal);
       if(brightness < 0.2f) brightness = 0.2f;
       float count = 0;
@@ -1069,9 +1162,19 @@ RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDire
       }
       if(brightness > 1.0f) brightness = 1.0f;
       Colour c = intersectionP.intersectedTriangle.colour;
+      // uint32_t newColour = specularF * ((255<<24) + (int(255)<<16) + (int(255)<<8) + int(255)) + (1-specularF) * brightness * ((255<<24) + (int(c.red )<<16) + (int(c.green)<<8) + int(c.blue));
+      // float red = (newColour >> 16) & 255;
+      // float green = (newColour >> 8) & 255;
+      // float blue = (newColour) & 255;
       c.red = c.red * brightness;
       c.green = c.green * brightness;
       c.blue = c.blue * brightness;
+      // float red = (specularF * 255) + ((1-specularF) * brightness * c.red);
+      // float green = (specularF * 255) + ((1-specularF) * brightness * c.green);
+      // float blue = (specularF * 255) + ((1-specularF) * brightness * c.blue);
+      // c.red = red;
+      // c.green = green;
+      // c.blue = blue;
       intersectionP.intersectedTriangle.colour = c;
     }
     else if(intersectionP.intersectedTriangle.name == "hackspace"){
@@ -1110,23 +1213,84 @@ RayTriangleIntersection getClosestIntersection(vec3 cameraPosition, vec3 rayDire
       c.blue = blue * brightness;
       intersectionP.intersectedTriangle.colour = c;
     }
-     if(intersectionP.intersectedTriangle.name == "mirror"){
-      vec3 reflectionNormal = normaltoVertices(intersectionP.intersectedTriangle);
-      vec3 reflectionRay = rayDirection - (2.0f * reflectionNormal * (dot(rayDirection,reflectionNormal)));
-      vector<ModelTriangle> newSet = removeTriangle(intersectionP.intersectedTriangle,triangles);
-      RayTriangleIntersection intersectR = getClosestIntersection(intersectionP.intersectionPoint,reflectionRay,newSet,textureTriangles,colours);
-      if(intersectR.distanceFromCamera == -INFINITY){
-        Colour c = intersectionP.intersectedTriangle.colour;
-        c.red = 0;
-        c.green = 0;
-        c.blue = 0;
-        intersectionP.intersectedTriangle.colour = c;
+    else if(intersectionP.intersectedTriangle.name == "rightwall"){
+      int indB = getIndex(intersectionP.intersectedTriangle,triangles4);
+      int ind = getIndex(intersectionP.intersectedTriangle,triangles);
+      ModelTexture textureTriangle = bumptrianglesray[indB];
+      TexturePoint p1 = textureTriangle.vertices[0];
+      TexturePoint p2 = textureTriangle.vertices[1];
+      TexturePoint p3 = textureTriangle.vertices[2];
+
+      vec2 tp1 = vec2(p1.x,p1.y) * 949.0f;
+      vec2 tp2 = vec2(p2.x,p2.y) * 949.0f;
+      vec2 tp3 = vec2(p3.x,p3.y) * 949.0f;
+      vec3 surfacenormal;
+      vec2 texPoint = tp1 + (u*(tp2-tp1)) + (v*(tp3-tp1));
+
+      if((int)texPoint.x >=0 && (int)texPoint.y>=0 && (int)texPoint.y <= 949 && (int)texPoint.x <= 949 ){
+        surfacenormal = surfaceNormals[(int)texPoint.x + (int)texPoint.y * 949 ];
       }
-      else{
-        Colour reflectedColour = intersectR.intersectedTriangle.colour;
-        intersectionP.intersectedTriangle.colour = reflectedColour;
+      else surfacenormal = normaltovertices;
+      float brightness = compBrightness(intersectionP.intersectionPoint, surfacenormal);
+      if(brightness < 0.2f) brightness = 0.2f;
+      float count = 0;
+      for(u_int i = 0;i<whitelights.size();i++){
+        if(inShadow(intersectionP.intersectionPoint, whitelights[i],triangles,ind)){
+          count++;
+        }
       }
+      float ratio = count/13;
+      brightness *= 1 - ratio;
+      if(brightness<0.15f){
+        brightness = 0.15f;
+      }
+      if(brightness > 1.0f) brightness = 1.0f;
+      Colour c = intersectionP.intersectedTriangle.colour;
+      c.red = c.red * brightness;
+      c.green = c.green * brightness;
+      c.blue = c.blue * brightness;
+      intersectionP.intersectedTriangle.colour = c;
     }
+    else if(intersectionP.intersectedTriangle.name == "metal"){
+        float randNum = RandomFloat(-0.1,0.1);
+        vec3 reflectionNormal = normaltoVertices(intersectionP.intersectedTriangle);
+        vec3 reflectionRay = rayDirection - ((2 + randNum) * reflectionNormal * (dot(rayDirection,reflectionNormal)));
+        vector<ModelTriangle> newSet = removeTriangle(intersectionP.intersectedTriangle,triangles);
+        RayTriangleIntersection intersectR = getClosestIntersection(intersectionP.intersectionPoint,reflectionRay,newSet,textureTriangles,colours);
+        if(intersectR.distanceFromCamera == -INFINITY){
+          Colour c = intersectionP.intersectedTriangle.colour;
+          c.red = 0;
+          c.green = 0;
+          c.blue = 0;
+          intersectionP.intersectedTriangle.colour = c;
+        }
+        else{
+          Colour reflectedColour = intersectR.intersectedTriangle.colour;
+          Colour wallcolour = intersectionP.intersectedTriangle.colour;
+          wallcolour.red = (0.6*(wallcolour.red)) + (0.4*reflectedColour.red);
+          wallcolour.green = (0.6*(wallcolour.green)) + (0.4*reflectedColour.green);
+          wallcolour.blue = (0.6*(wallcolour.blue)) + (0.4*reflectedColour.blue);
+
+          intersectionP.intersectedTriangle.colour = wallcolour;
+        }
+      }
+    if(intersectionP.intersectedTriangle.name == "mirror"){
+        vec3 reflectionNormal = normaltoVertices(intersectionP.intersectedTriangle);
+        vec3 reflectionRay = rayDirection - (2.0f * reflectionNormal * (dot(rayDirection,reflectionNormal)));
+        vector<ModelTriangle> newSet = removeTriangle(intersectionP.intersectedTriangle,triangles);
+        RayTriangleIntersection intersectR = getClosestIntersection(intersectionP.intersectionPoint,reflectionRay,newSet,textureTriangles,colours);
+        if(intersectR.distanceFromCamera == -INFINITY){
+          Colour c = intersectionP.intersectedTriangle.colour;
+          c.red = 0;
+          c.green = 0;
+          c.blue = 0;
+          intersectionP.intersectedTriangle.colour = c;
+        }
+        else{
+          Colour reflectedColour = intersectR.intersectedTriangle.colour;
+          intersectionP.intersectedTriangle.colour = reflectedColour;
+        }
+      }
   }
 
   return intersectionP;
@@ -1137,13 +1301,13 @@ void antialiasing(vector<ModelTriangle> triangles,vector<ModelTexture> textureTr
   for(int x=0;x<WIDTH;x++){
     for(int y=0;y<HEIGHT;y++){
       vec3 dir = rayDir(x,y);
-      RayTriangleIntersection intersectP = getClosestIntersection(camera, dir, triangles,textureTriangles,colours);
+      RayTriangleIntersection intersectP = getClosestIntersection(camera, dir,triangles,textureTriangles,colours);
       vec3 dir1 = rayDir(x + 0.5 ,y + 0.5);
-      RayTriangleIntersection intersectP1 = getClosestIntersection(camera, dir1, triangles,textureTriangles,colours);
+      RayTriangleIntersection intersectP1 = getClosestIntersection(camera, dir1,triangles,textureTriangles,colours);
       vec3 dir2 = rayDir(x + 0.5 ,y - 0.5);
-      RayTriangleIntersection intersectP2 = getClosestIntersection(camera, dir2, triangles,textureTriangles,colours);
+      RayTriangleIntersection intersectP2 = getClosestIntersection(camera, dir2,triangles,textureTriangles,colours);
       vec3 dir3 = rayDir(x - 0.5 ,y + 0.5);
-      RayTriangleIntersection intersectP3 = getClosestIntersection(camera, dir3, triangles,textureTriangles,colours);
+      RayTriangleIntersection intersectP3 = getClosestIntersection(camera, dir3,triangles,textureTriangles,colours);
       vec3 dir4 = rayDir(x - 0.5 ,y - 0.5);
       RayTriangleIntersection intersectP4 = getClosestIntersection(camera, dir4, triangles,textureTriangles,colours);
 
@@ -1252,20 +1416,21 @@ void culling(vector<CanvasTriangle> triangles) {
   }
 }
 
+
 void computeRayT(vector<ModelTriangle> triangles,vector<ModelTexture> textureTriangles,vector<vec3> whitelights,vector<uint32_t> colours, vec3 camera){
   for(int x=0;x<WIDTH;x++){
     for(int y=0;y<HEIGHT;y++){
       vec3 dir = rayDir(x,y);
-      RayTriangleIntersection intersectP = getClosestIntersection(camera, dir, triangles,textureTriangles,colours);
+      RayTriangleIntersection intersectP = getClosestIntersection(camera, dir,triangles,textureTriangles,colours);
       ModelTriangle trianglex = intersectP.intersectedTriangle;
-      Colour c = trianglex.colour;
-      uint32_t colour = (255<<24) + (int(c.red )<<16) + (int(c.green)<<8) + int(c.blue);
-        if(intersectP.distanceFromCamera != -INFINITY){
-          window.setPixelColour(x, y, colour);
+        Colour c = trianglex.colour;
+        uint32_t colour = (255<<24) + (int(c.red )<<16) + (int(c.green)<<8) + int(c.blue);
+          if(intersectP.distanceFromCamera != -INFINITY){
+            window.setPixelColour(x, y, colour);
+          }
         }
+      }
     }
-  }
-}
 
 
 void initializePair(vector<ModelTriangle> triangles){
@@ -1306,8 +1471,7 @@ void lookAt (vec3 camera, vec3 point) {
   camOrien = inverse(transpose(newCamOrien));
 }
 
-int main(int argc, char* argv[])
-{
+
   vector<Colour> colours = readmat("cornell-box.mtl");
   vector<ModelTriangle> triangles = readtriangles("cornell-box.obj", colours);
   vector<ModelTriangle> triangles2 = readtriangles2("sphere.obj");
@@ -1319,96 +1483,145 @@ int main(int argc, char* argv[])
   vector<uint32_t> coloursTextures = loadImg("texture1.ppm");
 
 
-  vector<ModelTexture> completeTextures = textureTriangles3;
-  for(u_int i = 0;i<textureTriangles2.size();i++){
-    completeTextures.push_back(textureTriangles2[i]);
-  }
-  for(u_int i = 0;i<textureTriangles.size();i++){
-    completeTextures.push_back(textureTriangles[i]);
-  }
-  initializeTexturePoints(triangles3,textureTrianglesRay);
-  initializePair(triangles2);
+  void moveVertices(float x){
+    for(u_int i=0;i<triangles.size();i++){
+      triangles[i].vertices[0].y += x;
+      triangles[i].vertices[1].y += x;
+      triangles[i].vertices[2].y += x;
+    }
 
-  vector<ModelTriangle> complete = triangles;
-  for(u_int i = 0;i<triangles2.size();i++){
-    complete.push_back(triangles2[i]);
+    for(u_int i=0;i<triangles2.size();i++){
+      triangles2[i].vertices[0].y += x;
+      triangles2[i].vertices[1].y += x;
+      triangles2[i].vertices[2].y += x;
+    }
+
+    for(u_int i=0;i<triangles3.size();i++){
+      triangles3[i].vertices[0].y += x;
+      triangles3[i].vertices[1].y += x;
+      triangles3[i].vertices[2].y += x;
+    }
   }
-  for(u_int i = 0;i<triangles3.size();i++){
-    complete.push_back(triangles3[i]);
+
+  void draw(){
+    initializeTexturePoints(triangles3,textureTrianglesRay);
+    initializePair(triangles2);
+    vector<ModelTexture> completeTextures = textureTriangles3;
+
+    for(u_int i = 0;i<textureTriangles2.size();i++){
+      completeTextures.push_back(textureTriangles2[i]);
+    }
+    for(u_int i = 0;i<textureTriangles.size();i++){
+      completeTextures.push_back(textureTriangles[i]);
+    }
+    vector<ModelTriangle> complete = triangles;
+    for(u_int i = 0;i<triangles2.size();i++){
+      complete.push_back(triangles2[i]);
+    }
+    for(u_int i = 0;i<triangles3.size();i++){
+      complete.push_back(triangles3[i]);
+    }
+    window.clearPixels();
+    if (mode == 1) {
+      vector<CanvasTriangle> canvastriangles = modelToCanvas(camera, triangles,textureTriangles3, 5, 100);
+      vector<CanvasTriangle> canvastriangles2 = modelToCanvas(camera, triangles2,textureTriangles2, 5, 100);
+      vector<CanvasTriangle> canvastriangles3 = modelToCanvas(camera, triangles3,textureTriangles, 5, 100);
+      vector<CanvasTriangle> completeM = canvastriangles;
+      for(u_int i = 0;i<canvastriangles2.size();i++){
+        completeM.push_back(canvastriangles2[i]);
+      }
+      for(u_int i = 0;i<canvastriangles3.size();i++){
+        completeM.push_back(canvastriangles3[i]);
+      }
+      draw3DWireframes(completeM);
+    }
+    else if (mode == 2) {
+      vector<CanvasTriangle> canvastriangles = modelToCanvas(camera, triangles,textureTriangles3, 5, 100);
+      vector<CanvasTriangle> canvastriangles2 = modelToCanvas(camera, triangles2,textureTriangles2,  5, 100);
+      vector<CanvasTriangle> canvastriangles3 = modelToCanvas(camera, triangles3,textureTriangles, 5, 100);
+
+      vector<CanvasTriangle> completeM = canvastriangles;
+      for(u_int i = 0;i<canvastriangles2.size();i++){
+        completeM.push_back(canvastriangles2[i]);
+      }
+      for(u_int i = 0;i<canvastriangles3.size();i++){
+        completeM.push_back(canvastriangles3[i]);
+      }
+      vector<uint32_t> colours = loadImg("texture1.ppm");
+
+      draw3DRasterisedTriangles(completeM,colours);
+    }
+
+    else if (mode == 3) {
+      vector<ModelTriangle> complete2 = culledTriangles(complete);
+      computeRayT(complete2,textureTrianglesRay,whitelights,coloursTextures,camera);
+    }
+    else if (mode == 4) {
+      antialiasing(complete,textureTrianglesRay,coloursTextures);
+    }
+    else if (mode == 5){
+      vector<ModelTriangle> complete2 = culledTriangles(complete);
+      vector<CanvasTriangle> culledTrianglesx = modelToCanvas(camera, complete2,completeTextures, 5, 100);
+      culling(culledTrianglesx);
+    }
+    else if (mode == 6){
+      vector<CanvasTriangle> canvastriangles = modelToCanvas(camera, triangles,textureTriangles3, 5, 100);
+      vector<CanvasTriangle> canvastriangles2 = modelToCanvas(camera, triangles2,textureTriangles2,  5, 100);
+      vector<CanvasTriangle> canvastriangles3 = modelToCanvas(camera, triangles3,textureTriangles, 5, 100);
+      vector<CanvasTriangle> complete = canvastriangles;
+      for(u_int i = 0;i<canvastriangles2.size();i++){
+        complete.push_back(canvastriangles2[i]);
+      }
+      for(u_int i = 0;i<canvastriangles3.size();i++){
+        complete.push_back(canvastriangles3[i]);
+      }
+      for(u_int i = 0;i<complete.size();i++){
+        CanvasPoint point1 = complete[i].vertices[0];
+        CanvasPoint point2 = complete[i].vertices[1];
+        CanvasPoint point3 = complete[i].vertices[2];
+        Colour c = complete[i].colour;
+        float red = c.red;
+        float green = c.green;
+        float blue = c.blue;
+        uint32_t colour = (255<<24) + (int(red)<<16) + (int(green)<<8) + int(blue);
+        drawWuLines(point1, point2, colour);
+        drawWuLines(point2, point3, colour);
+        drawWuLines(point1, point3, colour);
+      }
+    }
   }
+
+void animate(float displacement){
+  float u = sqrt(2 * 9.81 * displacement);
+  float time = (2*u)/9.81;
+  for(float i=0;i<time;i+=0.03){
+    float displaceby = (u * i)+(-9.81 * i * i)/2;
+    moveVertices(displaceby);
+    draw();
+    window.renderFrame();
+    // savePPM();
+    // cout<<"ImageSaved"<<endl;
+    // fileCount++;
+    moveVertices(-displaceby);
+  }
+}
+
+void jump()
+{
+  for(float a = 3; a >= 0; a-=0.5)
+  {
+    animate(a);
+  }
+}
+
+int main(int argc, char* argv[])
+{
   SDL_Event event;
+  draw();
   while(true)
   {
     if(window.pollForInputEvents(&event)){
       handleEvent(event);
-      window.clearPixels();
-      if (mode == 1) {
-        vector<CanvasTriangle> canvastriangles = modelToCanvas(camera, triangles,textureTriangles3, 5, 100);
-        vector<CanvasTriangle> canvastriangles2 = modelToCanvas(camera, triangles2,textureTriangles2, 5, 100);
-        vector<CanvasTriangle> canvastriangles3 = modelToCanvas(camera, triangles3,textureTriangles, 5, 100);
-        vector<CanvasTriangle> complete = canvastriangles;
-        for(u_int i = 0;i<canvastriangles2.size();i++){
-          complete.push_back(canvastriangles2[i]);
-        }
-        for(u_int i = 0;i<canvastriangles3.size();i++){
-          complete.push_back(canvastriangles3[i]);
-        }
-        draw3DWireframes(complete);
-      }
-
-      else if (mode == 2) {
-        vector<CanvasTriangle> canvastriangles = modelToCanvas(camera, triangles,textureTriangles3, 5, 100);
-        vector<CanvasTriangle> canvastriangles2 = modelToCanvas(camera, triangles2,textureTriangles2,  5, 100);
-        vector<CanvasTriangle> canvastriangles3 = modelToCanvas(camera, triangles3,textureTriangles, 5, 100);
-
-        vector<CanvasTriangle> complete = canvastriangles;
-        for(u_int i = 0;i<canvastriangles2.size();i++){
-          complete.push_back(canvastriangles2[i]);
-        }
-        for(u_int i = 0;i<canvastriangles3.size();i++){
-          complete.push_back(canvastriangles3[i]);
-        }
-        vector<uint32_t> colours = loadImg("texture1.ppm");
-
-        draw3DRasterisedTriangles(complete,colours);
-      }
-
-      else if (mode == 3) {
-        computeRayT(complete,textureTrianglesRay,whitelights,coloursTextures,camera);
-      }
-      else if (mode == 4) {
-        antialiasing(triangles,textureTrianglesRay,coloursTextures);
-      }
-      else if (mode == 5){
-        vector<ModelTriangle> complete2 = culledTriangles(complete);
-        vector<CanvasTriangle> culledTrianglesx = modelToCanvas(camera, complete2,completeTextures, 5, 100);
-        culling(culledTrianglesx);
-      }
-      else if (mode == 6){
-        vector<CanvasTriangle> canvastriangles = modelToCanvas(camera, triangles,textureTriangles3, 5, 100);
-        vector<CanvasTriangle> canvastriangles2 = modelToCanvas(camera, triangles2,textureTriangles2,  5, 100);
-        vector<CanvasTriangle> canvastriangles3 = modelToCanvas(camera, triangles3,textureTriangles, 5, 100);
-        vector<CanvasTriangle> complete = canvastriangles;
-        for(u_int i = 0;i<canvastriangles2.size();i++){
-          complete.push_back(canvastriangles2[i]);
-        }
-        for(u_int i = 0;i<canvastriangles3.size();i++){
-          complete.push_back(canvastriangles3[i]);
-        }
-        for(u_int i = 0;i<complete.size();i++){
-          CanvasPoint point1 = complete[i].vertices[0];
-          CanvasPoint point2 = complete[i].vertices[1];
-          CanvasPoint point3 = complete[i].vertices[2];
-          Colour c = complete[i].colour;
-          float red = c.red;
-          float green = c.green;
-          float blue = c.blue;
-          uint32_t colour = (255<<24) + (int(red)<<16) + (int(green)<<8) + int(blue);
-          drawWuLines(point1, point2, colour);
-          drawWuLines(point2, point3, colour);
-          drawWuLines(point1, point3, colour);
-        }
-      }
     }
     window.renderFrame();
   }
@@ -1442,57 +1655,84 @@ void handleEvent(SDL_Event event)
     if(event.key.keysym.sym == SDLK_LEFT){
       cout << "LEFT" << endl;
       camera.x -= 0.1;
+      draw();
+      // savePPM();
+      // cout<<"ImageSaved"<<endl;
+      // fileCount++;
     }
     else if(event.key.keysym.sym == SDLK_RIGHT){
       cout << "RIGHT" << endl;
       camera.x += 0.1;
+      draw();
     }
     else if(event.key.keysym.sym == SDLK_UP) {
       cout << "UP" << endl;
       camera.y += 0.1;
+      draw();
     }
     else if(event.key.keysym.sym == SDLK_DOWN){
       cout << "DOWN" << endl;
       camera.y -= 0.1;
+      draw();
     }
     else if(event.key.keysym.sym == SDLK_w){
       cout << "FORWARD" << endl;
       camera.z -= 0.1;
+      draw();
     }
     else if(event.key.keysym.sym == SDLK_s){
       cout << "BACKWARD" << endl;
       camera.z += 0.1;
+      draw();
     }
 
     else if(event.key.keysym.sym == SDLK_g){
       whitelight.x -= 0.1;
       cout << "LightLeft" << endl;
-
+      draw();
+      // savePPM();
+      // fileCount++;
+      // cout<<"ImageSaved"<<endl;
     }
     else if(event.key.keysym.sym == SDLK_j){
       whitelight.x += 0.1;
       cout << "LightRight" << endl;
-
+      draw();
+      // savePPM();
+      // fileCount++;
+      // cout<<"ImageSaved"<<endl;
     }
     else if(event.key.keysym.sym == SDLK_u) {
       whitelight.y += 0.1;
       cout << "LightUp" << endl;
-
+      draw();
+      // savePPM();
+      // fileCount++;
+      // cout<<"ImageSaved"<<endl;
     }
     else if(event.key.keysym.sym == SDLK_h){
       whitelight.y -= 0.1;
       cout << "LightDown" << endl;
-
+      draw();
+      // savePPM();
+      // fileCount++;
+      // cout<<"ImageSaved"<<endl;
     }
     else if(event.key.keysym.sym == SDLK_n){
       whitelight.z -= 0.1;
       cout << "LightForward" << endl;
-
+      draw();
+      // savePPM();
+      // fileCount++;
+      // cout<<"ImageSaved"<<endl;
     }
     else if(event.key.keysym.sym == SDLK_b){
       whitelight.z += 0.1;
       cout << "LightBackward" << endl;
-
+      draw();
+      // savePPM();
+      // fileCount++;
+      // cout<<"ImageSaved"<<endl;
     }
     else if(event.key.keysym.sym == SDLK_p){
       cout << whitelight.x << endl;
@@ -1500,33 +1740,40 @@ void handleEvent(SDL_Event event)
       cout << whitelight.z << endl;
     }
     else if(event.key.keysym.sym == SDLK_v){
-      cout << "SaveImage" << endl;
       savePPM();
+      cout<<"ImageSaved"<<endl;
+      fileCount++;
     }
 
     else if(event.key.keysym.sym == SDLK_1) {
       mode = 1;
       cout << "WireFrame Mode" << endl;
+      draw();
     }
     else if(event.key.keysym.sym == SDLK_2) {
       mode = 2;
       cout << "Rasterizer Mode" << endl;
+      draw();
     }
     else if(event.key.keysym.sym == SDLK_3) {
       mode = 3;
       cout << "Raytracer Mode" << endl;
+      draw();
     }
     else if(event.key.keysym.sym == SDLK_4) {
       mode = 4;
       cout << "Antialiasing Mode" << endl;
+      draw();
     }
     else if(event.key.keysym.sym == SDLK_5) {
       mode = 5;
       cout << "Culling Mode" << endl;
+      draw();
     }
     else if(event.key.keysym.sym == SDLK_6) {
       mode = 6;
       cout << "Wu Lines Mode" << endl;
+      draw();
     }
     else if(event.key.keysym.sym == SDLK_c) {
       window.clearPixels();
@@ -1534,23 +1781,33 @@ void handleEvent(SDL_Event event)
     else if(event.key.keysym.sym == SDLK_x) {
       rotateX(angle);
       cout << "ROTATE-X" << endl;
+      draw();
     }
     else if(event.key.keysym.sym == SDLK_y) {
       rotateY(-angle);
       cout << "ROTATE-Y" << endl;
+      draw();
     }
     else if(event.key.keysym.sym == SDLK_z) {
       rotateZ(angle);
       cout << "ROTATE-Z" << endl;
+      draw();
     }
     else if(event.key.keysym.sym == SDLK_l) {
       lookAt(camera, whitelight);
+      draw();
     }
     else if(event.key.keysym.sym == SDLK_r) {
       camera = vec3(0,0,6);
       camOrien = mat3();
       cout << "RESET" << endl;
+      draw();
+    }
+    else if(event.key.keysym.sym == SDLK_7) {
+      cout << "Animation" << endl;
+      jump();
     }
   }
   else if(event.type == SDL_MOUSEBUTTONDOWN) cout << "MOUSE CLICKED" << endl;
 }
+// ffmpeg -framerate 40 -i rasteriser_frames/%d.ppm -c:v libx264 -profile:v high -crf 18 -pix_fmt yuv420p -q 4 rasteriser.mp4
